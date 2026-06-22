@@ -1,0 +1,990 @@
+/*__________________________________________________________________;
+[Variables] – Jampack Theme (Teal Primary Edition)
+Updated: December 2025
+Primary: #007D88 (Teal) | Success: #00D67F | Info: #18DDEF
+___________________________________________________________________*/
+
+// Color variables
+$red: #FF0000;
+$green: #00D67F;
+$pink: #E92990;
+$purple: #C02FF3;
+$violet: #7429F8;
+$indigo: #322BF3;
+$blue: #298DFF;
+$sky: #00B0FF;
+$cyan: #18DDEF;
+$teal: #007D88;
+$neon: #81E230;
+$lime: #C2E939;
+$sun: #FFEA00;
+$yellow: #FFC400;
+$orange: #FF9100;
+$pumpkin: #FF5700;
+$brown: #954D15;
+$gold: #C39749;
+$smoke: #5e7d8a;
+$gray: #9e9e9e;
+$black: #2F343A;
+$white: #fff;
+
+// Red color variables
+$red_light_5: mix(white, $red, 92%);
+$red_light_4: mix(white, $red, 78%);
+$red_light_3: mix(white, $red, 60%);
+$red_light_2: mix(white, $red, 42%);
+$red_light_1: mix(white, $red, 24%);
+$red_dark_1: mix(black, $red, 10%);
+$red_dark_2: mix(black, $red, 20%);
+$red_dark_3: mix(black, $red, 30%);
+$red_dark_4: mix(black, $red, 40%);
+$red_dark_5: mix(black, $red, 50%);
+
+// Green color variables
+$green_light_5: mix(white, $green, 92%);
+$green_light_4: mix(white, $green, 78%);
+$green_light_3: mix(white, $green, 60%);
+$green_light_2: mix(white, $green, 42%);
+$green_light_1: mix(white, $green, 24%);
+$green_dark_1: mix(black, $green, 10%);
+$green_dark_2: mix(black, $green, 20%);
+$green_dark_3: mix(black, $green, 30%);
+$green_dark_4: mix(black, $green, 40%);
+$green_dark_5: mix(black, $green, 50%);
+
+// Pink color variables
+$pink_light_5: mix(white, $pink, 92%);
+$pink_light_4: mix(white, $pink, 78%);
+$pink_light_3: mix(white, $pink, 60%);
+$pink_light_2: mix(white, $pink, 42%);
+$pink_light_1: mix(white, $pink, 24%);
+$pink_dark_1: mix(black, $pink, 10%);
+$pink_dark_2: mix(black, $pink, 20%);
+$pink_dark_3: mix(black, $pink, 30%);
+$pink_dark_4: mix(black, $pink, 40%);
+$pink_dark_5: mix(black, $pink, 50%);
+
+// Purple color variables
+$purple_light_5: mix(white, $purple, 92%);
+$purple_light_4: mix(white, $purple, 78%);
+$purple_light_3: mix(white, $purple, 60%);
+$purple_light_2: mix(white, $purple, 42%);
+$purple_light_1: mix(white, $purple, 24%);
+$purple_dark_1: mix(black, $purple, 10%);
+$purple_dark_2: mix(black, $purple, 20%);
+$purple_dark_3: mix(black, $purple, 30%);
+$purple_dark_4: mix(black, $purple, 40%);
+$purple_dark_5: mix(black, $purple, 50%);
+
+// Violet color variables
+$violet_light_5: mix(white, $violet, 92%);
+$violet_light_4: mix(white, $violet, 78%);
+$violet_light_3: mix(white, $violet, 60%);
+$violet_light_2: mix(white, $violet, 42%);
+$violet_light_1: mix(white, $violet, 24%);
+$violet_dark_1: mix(black, $violet, 10%);
+$violet_dark_2: mix(black, $violet, 20%);
+$violet_dark_3: mix(black, $violet, 30%);
+$violet_dark_4: mix(black, $violet, 40%);
+$violet_dark_5: mix(black, $violet, 50%);
+
+// Indigo color variables
+$indigo_light_5: mix(white, $indigo, 92%);
+$indigo_light_4: mix(white, $indigo, 78%);
+$indigo_light_3: mix(white, $indigo, 60%);
+$indigo_light_2: mix(white, $indigo, 42%);
+$indigo_light_1: mix(white, $indigo, 24%);
+$indigo_dark_1: mix(black, $indigo, 10%);
+$indigo_dark_2: mix(black, $indigo, 20%);
+$indigo_dark_3: mix(black, $indigo, 30%);
+$indigo_dark_4: mix(black, $indigo, 40%);
+$indigo_dark_5: mix(black, $indigo, 50%);
+
+// Blue color variables
+$blue_light_5: mix(white, $blue, 92%);
+$blue_light_4: mix(white, $blue, 78%);
+$blue_light_3: mix(white, $blue, 60%);
+$blue_light_2: mix(white, $blue, 42%);
+$blue_light_1: mix(white, $blue, 24%);
+$blue_dark_1: mix(black, $blue, 10%);
+$blue_dark_2: mix(black, $blue, 20%);
+$blue_dark_3: mix(black, $blue, 30%);
+$blue_dark_4: mix(black, $blue, 40%);
+$blue_dark_5: mix(black, $blue, 50%);
+
+// Sky color variables
+$sky_light_5: mix(white, $sky, 92%);
+$sky_light_4: mix(white, $sky, 78%);
+$sky_light_3: mix(white, $sky, 60%);
+$sky_light_2: mix(white, $sky, 42%);
+$sky_light_1: mix(white, $sky, 24%);
+$sky_dark_1: mix(black, $sky, 10%);
+$sky_dark_2: mix(black, $sky, 20%);
+$sky_dark_3: mix(black, $sky, 30%);
+$sky_dark_4: mix(black, $sky, 40%);
+$sky_dark_5: mix(black, $sky, 50%);
+
+// Cyan color variables
+$cyan_light_5: mix(white, $cyan, 92%);
+$cyan_light_4: mix(white, $cyan, 78%);
+$cyan_light_3: mix(white, $cyan, 60%);
+$cyan_light_2: mix(white, $cyan, 42%);
+$cyan_light_1: mix(white, $cyan, 24%);
+$cyan_dark_1: mix(black, $cyan, 10%);
+$cyan_dark_2: mix(black, $cyan, 20%);
+$cyan_dark_3: mix(black, $cyan, 30%);
+$cyan_dark_4: mix(black, $cyan, 40%);
+$cyan_dark_5: mix(black, $cyan, 50%);
+
+// Teal color variables
+$teal_light_5: mix(white, $teal, 92%);
+$teal_light_4: mix(white, $teal, 78%);
+$teal_light_3: mix(white, $teal, 60%);
+$teal_light_2: mix(white, $teal, 42%);
+$teal_light_1: mix(white, $teal, 24%);
+$teal_dark_1: mix(black, $teal, 10%);
+$teal_dark_2: mix(black, $teal, 20%);
+$teal_dark_3: mix(black, $teal, 30%);
+$teal_dark_4: mix(black, $teal, 40%);
+$teal_dark_5: mix(black, $teal, 50%);
+
+// Neon color variables
+$neon_light_5: mix(white, $neon, 92%);
+$neon_light_4: mix(white, $neon, 78%);
+$neon_light_3: mix(white, $neon, 60%);
+$neon_light_2: mix(white, $neon, 42%);
+$neon_light_1: mix(white, $neon, 24%);
+$neon_dark_1: mix(black, $neon, 10%);
+$neon_dark_2: mix(black, $neon, 20%);
+$neon_dark_3: mix(black, $neon, 30%);
+$neon_dark_4: mix(black, $neon, 40%);
+$neon_dark_5: mix(black, $neon, 50%);
+
+// Lime color variables
+$lime_light_5: mix(white, $lime, 92%);
+$lime_light_4: mix(white, $lime, 78%);
+$lime_light_3: mix(white, $lime, 60%);
+$lime_light_2: mix(white, $lime, 42%);
+$lime_light_1: mix(white, $lime, 24%);
+$lime_dark_1: mix(black, $lime, 10%);
+$lime_dark_2: mix(black, $lime, 20%);
+$lime_dark_3: mix(black, $lime, 30%);
+$lime_dark_4: mix(black, $lime, 40%);
+$lime_dark_5: mix(black, $lime, 50%);
+
+// Sun color variables
+$sun_light_5: mix(white, $sun, 92%);
+$sun_light_4: mix(white, $sun, 78%);
+$sun_light_3: mix(white, $sun, 60%);
+$sun_light_2: mix(white, $sun, 42%);
+$sun_light_1: mix(white, $sun, 24%);
+$sun_dark_1: mix(black, $sun, 10%);
+$sun_dark_2: mix(black, $sun, 20%);
+$sun_dark_3: mix(black, $sun, 30%);
+$sun_dark_4: mix(black, $sun, 40%);
+$sun_dark_5: mix(black, $sun, 50%);
+
+// Yellow color variables
+$yellow_light_5: mix(white, $yellow, 92%);
+$yellow_light_4: mix(white, $yellow, 78%);
+$yellow_light_3: mix(white, $yellow, 60%);
+$yellow_light_2: mix(white, $yellow, 42%);
+$yellow_light_1: mix(white, $yellow, 24%);
+$yellow_dark_1: mix(black, $yellow, 10%);
+$yellow_dark_2: mix(black, $yellow, 20%);
+$yellow_dark_3: mix(black, $yellow, 30%);
+$yellow_dark_4: mix(black, $yellow, 40%);
+$yellow_dark_5: mix(black, $yellow, 50%);
+
+// Orange color variables
+$orange_light_5: mix(white, $orange, 92%);
+$orange_light_4: mix(white, $orange, 78%);
+$orange_light_3: mix(white, $orange, 60%);
+$orange_light_2: mix(white, $orange, 42%);
+$orange_light_1: mix(white, $orange, 24%);
+$orange_dark_1: mix(black, $orange, 10%);
+$orange_dark_2: mix(black, $orange, 20%);
+$orange_dark_3: mix(black, $orange, 30%);
+$orange_dark_4: mix(black, $orange, 40%);
+$orange_dark_5: mix(black, $orange, 50%);
+
+// Pumpkin color variables
+$pumpkin_light_5: mix(white, $pumpkin, 92%);
+$pumpkin_light_4: mix(white, $pumpkin, 78%);
+$pumpkin_light_3: mix(white, $pumpkin, 60%);
+$pumpkin_light_2: mix(white, $pumpkin, 42%);
+$pumpkin_light_1: mix(white, $pumpkin, 24%);
+$pumpkin_dark_1: mix(black, $pumpkin, 10%);
+$pumpkin_dark_2: mix(black, $pumpkin, 20%);
+$pumpkin_dark_3: mix(black, $pumpkin, 30%);
+$pumpkin_dark_4: mix(black, $pumpkin, 40%);
+$pumpkin_dark_5: mix(black, $pumpkin, 50%);
+
+// Brown color variables
+$brown_light_5: mix(white, $brown, 92%);
+$brown_light_4: mix(white, $brown, 78%);
+$brown_light_3: mix(white, $brown, 60%);
+$brown_light_2: mix(white, $brown, 42%);
+$brown_light_1: mix(white, $brown, 24%);
+$brown_dark_1: mix(black, $brown, 10%);
+$brown_dark_2: mix(black, $brown, 20%);
+$brown_dark_3: mix(black, $brown, 30%);
+$brown_dark_4: mix(black, $brown, 40%);
+$brown_dark_5: mix(black, $brown, 50%);
+
+// Gold color variables
+$gold_light_5: mix(white, $gold, 92%);
+$gold_light_4: mix(white, $gold, 78%);
+$gold_light_3: mix(white, $gold, 60%);
+$gold_light_2: mix(white, $gold, 42%);
+$gold_light_1: mix(white, $gold, 24%);
+$gold_dark_1: mix(black, $gold, 10%);
+$gold_dark_2: mix(black, $gold, 20%);
+$gold_dark_3: mix(black, $gold, 30%);
+$gold_dark_4: mix(black, $gold, 40%);
+$gold_dark_5: mix(black, $gold, 50%);
+
+// Smoke color variables
+$smoke_light_5: mix(white, $smoke, 92%);
+$smoke_light_4: mix(white, $smoke, 78%);
+$smoke_light_3: mix(white, $smoke, 60%);
+$smoke_light_2: mix(white, $smoke, 42%);
+$smoke_light_1: mix(white, $smoke, 24%);
+$smoke_dark_1: mix(black, $smoke, 10%);
+$smoke_dark_2: mix(black, $smoke, 20%);
+$smoke_dark_3: mix(black, $smoke, 30%);
+$smoke_dark_4: mix(black, $smoke, 40%);
+$smoke_dark_5: mix(black, $smoke, 50%);
+
+// gray color variables
+$gray_light_5: mix(white, $gray, 92%);
+$gray_light_4: mix(white, $gray, 78%);
+$gray_light_3: mix(white, $gray, 60%);
+$gray_light_2: mix(white, $gray, 42%);
+$gray_light_1: mix(white, $gray, 24%);
+$gray_dark_1: mix(black, $gray, 10%);
+$gray_dark_2: mix(black, $gray, 20%);
+$gray_dark_3: mix(black, $gray, 30%);
+$gray_dark_4: mix(black, $gray, 40%);
+$gray_dark_5: mix(black, $gray, 50%);
+
+// Dark color variables
+$black_1: mix(black, $black, 10%);
+$black_2: mix(black, $black, 20%);
+$black_3: mix(black, $black, 30%);
+$black_4: mix(black, $black, 40%);
+$black_5: mix(black, $black, 50%);
+
+// Theme color variables
+$primary : $teal;
+$info : $cyan;
+$success : $green;
+$danger : $red;
+$warning : $yellow;
+$secondary : $gray_dark_3;
+$dark : $black_2;
+$light : $gray_light_5;
+
+// Primary color variables 
+$primary_light_5: mix(white, $primary, 92%);
+$primary_light_4: mix(white, $primary, 78%);
+$primary_light_3: mix(white, $primary, 60%);
+$primary_light_2: mix(white, $primary, 42%);
+$primary_light_1: mix(white, $primary, 24%);
+$primary_dark_1: mix(black, $primary, 10%);
+$primary_dark_2: mix(black, $primary, 20%);
+$primary_dark_3: mix(black, $primary, 30%);
+$primary_dark_4: mix(black, $primary, 40%);
+$primary_dark_5: mix(black, $primary, 50%);
+
+// Info color variables
+$info_light_5: mix(white, $info, 92%);
+$info_light_4: mix(white, $info, 78%);
+$info_light_3: mix(white, $info, 60%);
+$info_light_2: mix(white, $info, 42%);
+$info_light_1: mix(white, $info, 24%);
+$info_dark_1: mix(black, $info, 10%);
+$info_dark_2: mix(black, $info, 20%);
+$info_dark_3: mix(black, $info, 30%);
+$info_dark_4: mix(black, $info, 40%);
+$info_dark_5: mix(black, $info, 50%);
+
+// Sucess color variables
+$success_light_5: mix(white, $success, 92%);
+$success_light_4: mix(white, $success, 78%);
+$success_light_3: mix(white, $success, 60%);
+$success_light_2: mix(white, $success, 42%);
+$success_light_1: mix(white, $success, 24%);
+$success_dark_1: mix(black, $success, 10%);
+$success_dark_2: mix(black, $success, 20%);
+$success_dark_3: mix(black, $success, 30%);
+$success_dark_4: mix(black, $success, 40%);
+$success_dark_5: mix(black, $success, 50%);
+
+// Danger color variables
+$danger_light_5: mix(white, $danger, 92%);
+$danger_light_4: mix(white, $danger, 78%);
+$danger_light_3: mix(white, $danger, 60%);
+$danger_light_2: mix(white, $danger, 42%);
+$danger_light_1: mix(white, $danger, 24%);
+$danger_dark_1: mix(black, $danger, 10%);
+$danger_dark_2: mix(black, $danger, 20%);
+$danger_dark_3: mix(black, $danger, 30%);
+$danger_dark_4: mix(black, $danger, 40%);
+$danger_dark_5: mix(black, $danger, 50%);
+
+// Warning color variables
+$warning_light_5: mix(white, $warning, 92%);
+$warning_light_4: mix(white, $warning, 78%);
+$warning_light_3: mix(white, $warning, 60%);
+$warning_light_2: mix(white, $warning, 42%);
+$warning_light_1: mix(white, $warning, 24%);
+$warning_dark_1: mix(black, $warning, 10%);
+$warning_dark_2: mix(black, $warning, 20%);
+$warning_dark_3: mix(black, $warning, 30%);
+$warning_dark_4: mix(black, $warning, 40%);
+$warning_dark_5: mix(black, $warning, 50%);
+
+// Secondary color variables 
+$secondary_light_5: mix(white, $secondary, 92%);
+$secondary_light_4: mix(white, $secondary, 78%);
+$secondary_light_3: mix(white, $secondary, 60%);
+$secondary_light_2: mix(white, $secondary, 42%);
+$secondary_light_1: mix(white, $secondary, 24%);
+$secondary_dark_1: mix(black, $secondary, 10%);
+$secondary_dark_2: mix(black, $secondary, 20%);
+$secondary_dark_3: mix(black, $secondary, 30%);
+$secondary_dark_4: mix(black, $secondary, 40%);
+$secondary_dark_5: mix(black, $secondary, 50%);
+
+// Social Media color variables
+$facebook: #1778F2;
+$twitter: #00acee;
+$dribbble: #ea4c89;
+$pinterest: #E60023;
+$youtube: #FF0000;
+$googleplus: #db4a39;
+$instagram: #f0100f;
+$behance: #053eff;
+$dropbox: #0061ff;
+$linkedin: #0077B5;
+$skype: #00aff0;
+$tumblr: #000000;
+$flickr: #0063dc;
+$behance: #1769ff;
+$github: #24292e;
+
+// scss-docs-start table-loop
+$table-variants: (
+  "primary": $primary,
+  "secondary": $secondary,
+  "success": $success,
+  "info": $info,
+  "warning": $warning,
+  "danger": $danger,
+  "light": $gray_light_5,
+  "dark": $black_2,
+  ) !default;
+// scss-docs-end table-loop
+
+// Theme-colors-start
+$theme-colors: (
+  "primary": --bs-primary,
+  "secondary": --bs-secondary,
+  "success": --bs-success,
+  "info": --bs-info,
+  "warning": --bs-warning,
+  "danger": --bs-danger,
+  "light": --bs-gray_light_5,
+  "dark": --bs-dark,
+  "red": --bs-red,
+  "green": --bs-green,
+  "pink": --bs-pink,
+  "purple": --bs-purple,
+  "violet": --bs-violet,
+  "indigo": --bs-indigo,
+  "blue": --bs-blue,
+  "sky": --bs-sky,
+  "cyan": --bs-cyan,
+  "teal": --bs-teal,
+  "neon": --bs-neon,
+  "lime": --bs-lime,
+  "sun": --bs-sun,
+  "yellow": --bs-yellow,
+  "orange": --bs-orange,
+  "pumpkin": --bs-pumpkin,
+  "brown": --bs-brown,
+  "gold": --bs-gold,
+  "smoke": --bs-smoke,
+  "gray": --bs-gray) !default;
+// Theme-colors-end
+
+// Theme-colors-rgb-start
+$theme-colors-rgb: (
+  "primary": --bs-primary-rgb,
+  "secondary": --bs-secondary-rgb,
+  "success": --bs-success-rgb,
+  "info": --bs-info-rgb,
+  "warning": --bs-warning-rgb,
+  "danger": --bs-danger-rgb,
+  "light": --bs-gray-rgb,
+  "dark": --bs-dark-rgb,
+  "red": --bs-red-rgb,
+  "green": --bs-green-rgb,
+  "pink": --bs-pink-rgb,
+  "purple": --bs-purple-rgb,
+  "violet": --bs-violet-rgb,
+  "indigo": --bs-indigo-rgb,
+  "blue": --bs-blue-rgb,
+  "sky": --bs-sky-rgb,
+  "cyan": --bs-cyan-rgb,
+  "teal": --bs-teal-rgb,
+  "neon": --bs-neon-rgb,
+  "lime": --bs-lime-rgb,
+  "sun": --bs-sun-rgb,
+  "yellow": --bs-yellow-rgb,
+  "orange": --bs-orange-rgb,
+  "pumpkin": --bs-pumpkin-rgb,
+  "brown": --bs-brown-rgb,
+  "gold": --bs-gold-rgb,
+  "smoke": --bs-smoke-rgb,
+  "gray": --bs-gray-rgb) !default;
+// Theme-colors-rgb-end
+
+$jampack-colors: (
+  "sky": $sky,
+  "cyan": $cyan,
+  "info": $info,
+  "green": $green,
+  "success": $success,
+  "yellow": $yellow,
+  "warning": $warning,
+  "red": $red,
+  "danger": $danger,
+  "blue": $blue,
+  "primary": $primary,
+  "pink": $pink,
+  "purple": $purple,
+  "violet": $violet,
+  "indigo": $indigo,
+  "teal": $teal,
+  "neon": $neon,
+  "lime": $lime,
+  "sun": $sun,
+  "orange": $orange,
+  "pumpkin": $pumpkin,
+  "brown": $brown,
+  "gold": $gold,
+  "smoke": $smoke,
+  "gray": $gray,
+  // Note: Mapped 'grey' class name to '$gray' variable
+  "grey": $gray,
+  "secondary": $secondary
+);
+
+
+
+:root,
+[data-bs-theme=light] {
+  // -- BOOTSTRAP CORE --
+  --bs-foreground:#{$black};
+  --bs-background:#{$white};
+  --bs-blue: #{$blue};
+  --bs-indigo: #{$indigo};
+  --bs-purple: #{$purple};
+  --bs-pink: #{$pink};
+  --bs-brown: #{$brown};
+  --bs-violet: #{$violet};
+  --bs-sky: #{$sky};
+  --bs-neon: #{$neon};
+  --bs-lime: #{$lime};
+  --bs-sun: #{$sun};
+  --bs-pumpkin: #{$pumpkin};
+  --bs-gold: #{$gold};
+  --bs-smoke: #{$smoke};
+  --bs-red: #{$red};
+  --bs-orange: #{$orange};
+  --bs-yellow: #{$yellow};
+  --bs-green: #{$green};
+  --bs-teal: #{$teal};
+  --bs-cyan: #{$cyan};
+  --bs-black: #{$black_2};
+  --bs-white: #{$white};
+  --bs-gray: #{$gray};
+  --bs-gray-dark: #343a40;
+  --bs-gray-100: #f8f9fa;
+  --bs-gray-200: #e9ecef;
+  --bs-gray-300: #dee2e6;
+  --bs-gray-400: #ced4da;
+  --bs-gray-500: #adb5bd;
+  --bs-gray-600: #6c757d;
+  --bs-gray-700: #495057;
+  --bs-gray-800: #343a40;
+  --bs-gray-900: #212529;
+  --bs-text-primary:#{$primary};
+  --bs-text-secondary:#{$secondary};
+  --bs-primary: #{$primary};
+  --bs-secondary: #{$secondary};
+  --bs-success: #{$success};
+  --bs-info: #{$info};
+  --bs-warning: #{$warning};
+  --bs-danger: #{$danger};
+  --bs-light: #{$light};
+  --bs-dark: #{$dark};
+  --bs-foreground-rgb: #{to-rgb($black)};
+  --bs-background-rgb: #{to-rgb($white)};
+  --bs-blue-rgb: #{to-rgb($blue)};
+  --bs-indigo-rgb: #{to-rgb($indigo)};
+  --bs-purple-rgb: #{to-rgb($purple)};
+  --bs-pink-rgb: #{to-rgb($pink)};
+  --bs-brown-rgb: #{to-rgb($brown)};
+  --bs-violet-rgb: #{to-rgb($violet)};
+  --bs-sky-rgb: #{to-rgb($sky)};
+  --bs-neon-rgb: #{to-rgb($neon)};
+  --bs-lime-rgb: #{to-rgb($lime)};
+  --bs-sun-rgb: #{to-rgb($sun)};
+  --bs-pumpkin-rgb: #{to-rgb($pumpkin)};
+  --bs-gold-rgb: #{to-rgb($gold)};
+  --bs-smoke-rgb: #{to-rgb($smoke)};
+  --bs-red-rgb: #{to-rgb($red)};
+  --bs-orange-rgb: #{to-rgb($orange)};
+  --bs-yellow-rgb: #{to-rgb($yellow)};
+  --bs-green-rgb: #{to-rgb($green)};
+  --bs-teal-rgb: #{to-rgb($teal)};
+  --bs-cyan-rgb: #{to-rgb($cyan)};
+  --bs-gray-rgb: #{to-rgb($gray)};
+  --bs-primary-rgb: #{to-rgb($primary)};
+  --bs-secondary-rgb: #{to-rgb($secondary)};
+  --bs-success-rgb: #{to-rgb($success)};
+  --bs-info-rgb: #{to-rgb($info)};
+  --bs-warning-rgb:#{to-rgb($warning)};
+  --bs-danger-rgb: #{to-rgb($danger)};
+  --bs-light-rgb: #{to-rgb($light)};
+  --bs-dark-rgb: #{to-rgb($dark)};
+  --hk-shadow-rgb: #{to-rgb($dark)};
+  --bs-white-rgb: #{to-rgb($white)};
+  --bs-black-rgb: #{to-rgb($black_2)};
+  --bs-body-color-rgb: #{to-rgb($gray_dark_3)};
+  --bs-body-bg-rgb: #{to-rgb($white)};
+  --bs-emphasis-color: #000;
+  --bs-emphasis-color-rgb: 0, 0, 0;
+  --bs-secondary-color: rgba(33, 37, 41, 0.75);
+  --bs-secondary-color-rgb: 33, 37, 41;
+  --bs-secondary-bg: #e9ecef;
+  --bs-secondary-bg-rgb: 233, 236, 239;
+  --bs-tertiary-color: rgba(33, 37, 41, 0.5);
+  --bs-tertiary-color-rgb: 33, 37, 41;
+  --bs-tertiary-bg: #f8f9fa;
+  --bs-tertiary-bg-rgb: 248, 249, 250;
+  --bs-heading-color: inherit;
+  --bs-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0));
+  --bs-body-font-size: 1rem;
+  --bs-body-font-weight: 400;
+  --bs-body-line-height: 1.5;
+  --bs-body-color: #{$gray_dark_3};
+  --bs-body-bg: #{$white};
+  --bs-border-width: 1px;
+  --bs-border-style: solid;
+  --bs-border-color: #{$gray_light_4};
+  --bs-border-color-translucent: rgba(0, 0, 0, 0.175);
+  --bs-border-radius: 0.375rem;
+  --bs-border-radius-sm: 0.25rem;
+  --bs-border-radius-lg: 0.5rem;
+  --bs-border-radius-xl: 1rem;
+  --bs-border-radius-xxl: 2rem;
+  --bs-border-radius-2xl: 2rem;
+  --bs-border-radius-pill: 50rem;
+  --bs-link-color: #{$primary};
+  --bs-link-color-rgb: #{to-rgb($primary)};
+  --bs-link-decoration: underline;
+  --bs-link-hover-color: #{$primary_light_1};
+  --bs-link-hover-color-rgb: #{to-rgb($primary_light_1)};
+  --bs-code-color: #{$primary};
+  --bs-highlight-bg: #{$orange};
+  --bs-body-font-family: var(--font-jampack);
+  --bs-text-opacity: 1;
+  --bs-bg-opacity: 1;
+  --bs-shadow-color: #{to-rgb($black)};
+  --bs-box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  --bs-box-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  --bs-box-shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+  --bs-box-shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.075);
+  --bs-focus-ring-width: 0.25rem;
+  --bs-focus-ring-opacity: 0.25;
+  --bs-focus-ring-color: rgba(#{$primary}, 0.25);
+  --bs-form-valid-color: #198754;
+  --bs-form-valid-border-color: #198754;
+  --bs-form-invalid-color: #dc3545;
+  --bs-form-invalid-border-color: #dc3545;
+  --bs-primary-text-emphasis: #{$primary_dark_3};
+  --bs-secondary-text-emphasis: #2b2f32;
+  --bs-success-text-emphasis: #0a3622;
+  --bs-info-text-emphasis: #055160;
+  --bs-warning-text-emphasis: #664d03;
+  --bs-danger-text-emphasis: #58151c;
+  --bs-light-text-emphasis: #495057;
+  --bs-dark-text-emphasis: #495057;
+  --bs-primary-bg-subtle: #{$primary_light_5};
+  --bs-secondary-bg-subtle: #e2e3e5;
+  --bs-success-bg-subtle: #d1e7dd;
+  --bs-info-bg-subtle: #cff4fc;
+  --bs-warning-bg-subtle: #fff3cd;
+  --bs-danger-bg-subtle: #f8d7da;
+  --bs-light-bg-subtle: #fcfcfd;
+  --bs-dark-bg-subtle: #ced4da;
+  --bs-primary-border-subtle:  #{$primary_light_2};
+  --bs-secondary-border-subtle: #c4c8cb;
+  --bs-success-border-subtle: #a3cfbb;
+  --bs-info-border-subtle: #9eeaf9;
+  --bs-warning-border-subtle: #ffe69c;
+  --bs-danger-border-subtle: #f1aeb5;
+  --bs-light-border-subtle: #e9ecef;
+  --bs-dark-border-subtle: #adb5bd;
+
+  /* --- EXTRA FOR SOFT COLORS --- */
+  --bs-soft-primary: #{$primary_light_5};
+  --bs-soft-secondary: #{$secondary_light_5};
+  --bs-soft-success: #{$success_light_5};
+  --bs-soft-info: #{$info_light_5};
+  --bs-soft-warning: #{$warning_light_5};
+  --bs-soft-danger: #{$danger_light_5};
+  --bs-soft-light: #{$gray_light_5};
+  --bs-soft-dark: #{$gray_light_3};
+
+  --bs-soft-red: #{$red_light_5};
+  --bs-soft-green: #{$green_light_5};
+  --bs-soft-pink: #{$pink_light_5};
+  --bs-soft-purple: #{$purple_light_5};
+  --bs-soft-violet: #{$violet_light_5};
+  --bs-soft-indigo: #{$indigo_light_5};
+  --bs-soft-blue: #{$blue_light_5};
+  --bs-soft-sky: #{$sky_light_5};
+  --bs-soft-cyan: #{$cyan_light_5};
+  --bs-soft-teal: #{$teal_light_5};
+  --bs-soft-neon: #{$neon_light_5};
+  --bs-soft-lime: #{$lime_light_5};
+  --bs-soft-sun: #{$sun_light_5};
+  --bs-soft-yellow: #{$yellow_light_5};
+  --bs-soft-orange: #{$orange_light_5};
+  --bs-soft-pumpkin: #{$pumpkin_light_5};
+  --bs-soft-brown: #{$brown_light_5};
+  --bs-soft-gold: #{$gold_light_5};
+  --bs-soft-smoke: #{$smoke_light_5};
+  --bs-soft-gray: #{$gray_light_5};
+  /* ---/ EXTRA FOR SOFT COLORS /--- */
+
+
+  /* --- HK- JAMAPACK CUSTOM APP VARIABLES (LIGHT) --- */
+  // These are the variables your custom components should use
+  --hk-bg-primary: #{$white};
+  --hk-bg-primary-rgb: #{to-rgb($white)};
+  --hk-bg-secondary: #{$gray_light_5};
+  --hk-bg-tertiary: #{$gray_light_4};
+  --hk-bg-hover: #f2f2f2; // Specific color from apps.scss
+  --hk-select-primary:#{$primary_light_5};
+
+  --hk-text-primary: #{$black_2};
+  --hk-text-secondary: #{$gray_dark_3};
+  --hk-text-tertiary: #{$gray};
+  --hk-text-on-dark-bg: #{$white}; // For text on dark backgrounds like .navbar-dark
+  --hk-text-primary-rgb: #{to-rgb($black_2)};
+  --hk-text-secondary-rgb: #{to-rgb($gray_dark_3)};
+  --hk-text-tertiary-rgb: #{to-rgb($gray)};
+
+  --hk-border-primary: #{$gray_light_4};
+  --hk-border-secondary: #{$gray_light_3};
+  --hk-border-tertiary: #{$gray_light_5};
+  --hk-scrim-bg: #{$black_2};
+  --hk-shadow-rgb: #{to-rgb($black)};
+
+  // -- Menu / Sidebar Specific
+  --hk-menu-bg: #{$white};
+  --hk-menu-text: #{$black_2};
+  --hk-menu-border: #{$gray_light_4};
+  --hk-menu-item-active-bg: #{rgba($primary, 0.15)};
+  --hk-menu-item-active-text: #{$primary};
+  --hk-menu-icon-color: #{$black_2};
+  --hk-menu-arrow-color: #{rgba($black_2, 0.3)};
+  --hk-menu-header-text: #{$gray};
+
+
+  // ********************************** For Background colors (.bg) Start ********************************** //
+  @each $name, $color in $jampack-colors {
+    // Base Color
+    --bs-bg-#{$name}: #{$color};
+
+    // Light Levels (Matching your original % mixes: 92%, 78%, 60%, 42%, 24%)
+    --bs-bg-#{$name}-light-5: #{mix(white, $color, 92%)};
+    --bs-bg-#{$name}-light-4: #{mix(white, $color, 78%)};
+    --bs-bg-#{$name}-light-3: #{mix(white, $color, 60%)};
+    --bs-bg-#{$name}-light-2: #{mix(white, $color, 42%)};
+    --bs-bg-#{$name}-light-1: #{mix(white, $color, 24%)};
+
+    // Dark Levels (Matching your original % mixes: 10%, 20%, 30%, 40%, 50%)
+    --bs-bg-#{$name}-dark-1: #{mix(black, $color, 10%)};
+    --bs-bg-#{$name}-dark-2: #{mix(black, $color, 20%)};
+    --bs-bg-#{$name}-dark-3: #{mix(black, $color, 30%)};
+    --bs-bg-#{$name}-dark-4: #{mix(black, $color, 40%)};
+    --bs-bg-#{$name}-dark-5: #{mix(black, $color, 50%)};
+  }
+
+  // ********************************** For Background colors (.bg) End ********************************** //
+
+}
+
+[data-bs-theme=dark] {
+  // -- BOOTSTRAP CORE (DARK MODE) --
+  
+  --bs-foreground:#{$white};
+  --bs-background:#{$black};
+  --bs-blue: #{$blue_dark_1}; // Darker variant for better contrast
+  --bs-indigo: #{$indigo_dark_1};
+  --bs-purple: #{$purple_dark_1};
+  --bs-pink: #{$pink_dark_1};
+  --bs-brown: #{$brown_dark_1};
+  --bs-violet: #{$violet_dark_1};
+  --bs-sky: #{$sky_dark_1};
+  --bs-neon: #{$neon_dark_1};
+  --bs-lime: #{$lime_dark_1};
+  --bs-sun: #{$sun_dark_1};
+  --bs-pumpkin: #{$pumpkin_dark_1};
+  --bs-gold: #{$gold_dark_1};
+  --bs-smoke: #{$smoke_dark_1};
+  --bs-red: #{$red_dark_1};
+  --bs-orange: #{$orange_dark_1};
+  --bs-yellow: #{$yellow_dark_1};
+  --bs-green: #{$green_dark_1};
+  --bs-teal: #{$teal_dark_1};
+  --bs-cyan: #{$cyan_dark_1};
+  --bs-black: #{$black_2};
+  --bs-white: #{$white};
+  --bs-gray: #{$gray_dark_3}; // Darker gray base
+  --bs-gray-dark: #212529;
+  --bs-gray-100: #343a40; // Inverted grays
+  --bs-gray-200: #495057;
+  --bs-gray-300: #6c757d;
+  --bs-gray-400: #adb5bd;
+  --bs-gray-500: #ced4da;
+  --bs-gray-600: #dee2e6;
+  --bs-gray-700: #f8f9fa;
+  --bs-gray-800: #ffffff;
+  --bs-gray-900: #ffffff;
+  --bs-text-primary: #{$white};
+  --bs-text-secondary: #{$gray_light_2};
+  --bs-primary: #{$primary_dark_2}; // Slightly darker primary for dark mode
+  --bs-secondary: #{$secondary_dark_1};
+  --bs-success: #{$success_dark_1};
+  --bs-info: #{$info_dark_1};
+  --bs-warning: #{$warning_dark_1};
+  --bs-danger: #{$danger_dark_1};
+  --bs-light: #{$gray_dark_5}; // Dark light variant
+  --bs-dark: #{$black_5};
+  --bs-foreground-rgb: #{to-rgb($white)};
+  --bs-background-rgb: #{to-rgb($black)};
+  --bs-blue-rgb: #{to-rgb($blue_dark_1)};
+  --bs-indigo-rgb: #{to-rgb($indigo_dark_1)};
+  --bs-purple-rgb: #{to-rgb($purple_dark_1)};
+  --bs-pink-rgb: #{to-rgb($pink_dark_1)};
+  --bs-brown-rgb: #{to-rgb($brown_dark_1)};
+  --bs-violet-rgb: #{to-rgb($violet_dark_1)};
+  --bs-sky-rgb: #{to-rgb($sky_dark_1)};
+  --bs-neon-rgb: #{to-rgb($neon_dark_1)};
+  --bs-lime-rgb: #{to-rgb($lime_dark_1)};
+  --bs-sun-rgb: #{to-rgb($sun_dark_1)};
+  --bs-pumpkin-rgb: #{to-rgb($pumpkin_dark_1)};
+  --bs-gold-rgb: #{to-rgb($gold_dark_1)};
+  --bs-smoke-rgb: #{to-rgb($smoke_dark_1)};
+  --bs-red-rgb: #{to-rgb($red_dark_1)};
+  --bs-orange-rgb: #{to-rgb($orange_dark_1)};
+  --bs-yellow-rgb: #{to-rgb($yellow_dark_1)};
+  --bs-green-rgb: #{to-rgb($green_dark_1)};
+  --bs-teal-rgb: #{to-rgb($teal_dark_1)};
+  --bs-cyan-rgb: #{to-rgb($cyan_dark_1)};
+  --bs-gray-rgb: #{to-rgb($gray_dark_3)};
+  --bs-primary-rgb: #{to-rgb($primary_dark_1)};
+  --bs-secondary-rgb: #{to-rgb($secondary_dark_1)};
+  --bs-success-rgb: #{to-rgb($success_dark_1)};
+  --bs-info-rgb: #{to-rgb($info_dark_1)};
+  --bs-warning-rgb: #{to-rgb($warning_dark_1)};
+  --bs-danger-rgb: #{to-rgb($danger_dark_1)};
+  --bs-light-rgb: #{to-rgb($gray_dark_5)};
+  --bs-dark-rgb: #{to-rgb($black_5)};
+  --hk-shadow-rgb: #{to-rgb($white)}; // Inverted shadow for dark
+  --bs-white-rgb: #{to-rgb($white)};
+  --bs-black-rgb: #{to-rgb($black_2)};
+  --bs-body-color-rgb: #{to-rgb($gray_light_1)}; // Light text on dark
+  --bs-body-bg-rgb: #{to-rgb(#212529)}; // Standard dark bg
+  --bs-emphasis-color: #fff; // White emphasis
+  --bs-emphasis-color-rgb: 255, 255, 255;
+  --bs-secondary-color: rgba(255, 255, 255, 0.75);
+  --bs-secondary-color-rgb: 255, 255, 255;
+  --bs-secondary-bg: #373b3e;
+  --bs-secondary-bg-rgb: 55, 59, 62;
+  --bs-tertiary-color: rgba(255, 255, 255, 0.5);
+  --bs-tertiary-color-rgb: 255, 255, 255;
+  --bs-tertiary-bg: #2b3035;
+  --bs-tertiary-bg-rgb: 43, 48, 53;
+  --bs-heading-color: inherit;
+  --bs-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0));
+  --bs-body-font-size: 1rem;
+  --bs-body-font-weight: 400;
+  --bs-body-line-height: 1.5;
+  --bs-body-color: #{$gray_light_1}; // Light body text
+  --bs-body-bg: #212529; // Dark body bg
+  --bs-border-width: 1px;
+  --bs-border-style: solid;
+  --bs-border-color: #35393F; // Dark borders
+  --bs-border-color-translucent: rgba(255, 255, 255, 0.175);
+  --bs-border-radius: 0.375rem;
+  --bs-border-radius-sm: 0.25rem;
+  --bs-border-radius-lg: 0.5rem;
+  --bs-border-radius-xl: 1rem;
+  --bs-border-radius-xxl: 2rem;
+  --bs-border-radius-2xl: 2rem;
+  --bs-border-radius-pill: 50rem;
+
+  --bs-link-color: #{$primary_light_1}; // Lighter link
+  --bs-link-color-rgb: #{to-rgb($primary_light_1)}; // Adjusted for dark
+  --bs-link-decoration: underline;
+  --bs-link-hover-color: #{$primary};
+  --bs-link-hover-color-rgb: #{to-rgb($primary)};
+  --bs-code-color: #{$primary_light_1};
+  --bs-highlight-bg: #{$orange_dark_1};
+  --bs-body-font-family: var(--font-jampack);
+  --bs-text-opacity: 1;
+  --bs-bg-opacity: 1;
+  --bs-shadow-color: #{to-rgb($white)}; // Light shadows
+  --bs-box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15); // Keep subtle
+  --bs-box-shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  --bs-box-shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+  --bs-box-shadow-inset: inset 0 1px 2px rgba(255, 255, 255, 0.075); // Inverted inset
+  --bs-focus-ring-width: 0.25rem;
+  --bs-focus-ring-opacity: 0.25;
+  --bs-focus-ring-color: rgba(#{$primary}, 0.25);
+  --bs-form-valid-color: #198754;
+  --bs-form-valid-border-color: #198754;
+  --bs-form-invalid-color: #dc3545;
+  --bs-form-invalid-border-color: #dc3545;
+  --bs-primary-text-emphasis: #{$primary_light_2}; // Lighter emphasis
+  --bs-secondary-text-emphasis: #a7acb1;
+  --bs-success-text-emphasis: #a3cfbb;
+  --bs-info-text-emphasis: #9eeaf9;
+  --bs-warning-text-emphasis: #ffe69c;
+  --bs-danger-text-emphasis: #f1aeb5;
+  --bs-light-text-emphasis: #f8f9fa;
+  --bs-dark-text-emphasis: #dee2e6;
+  --bs-primary-bg-subtle: #{rgba($primary, 0.15)}; // Subtle dark variants
+  --bs-secondary-bg-subtle: #41464b;
+  --bs-success-bg-subtle: #112433;
+  --bs-info-bg-subtle: #0e616e;
+  --bs-warning-bg-subtle: #332701;
+  --bs-danger-bg-subtle: #2c0b2e;
+  --bs-light-bg-subtle: #19191a;
+  --bs-dark-bg-subtle: #1b1a1b;
+  --bs-primary-border-subtle: #{rgba($primary, 0.2)};
+  --bs-secondary-border-subtle: #6c757d;
+  --bs-success-border-subtle: #259b5c;
+  --bs-info-border-subtle: #0ea5a8;
+  --bs-warning-border-subtle: #d6b32c;
+  --bs-danger-border-subtle: #b02a37;
+  --bs-light-border-subtle: #41464b;
+  --bs-dark-border-subtle: #6c757d;
+
+  /* --- EXTRA FOR SOFT COLORS --- */
+  // Uses RGBA with 15% opacity for a modern dark aesthetic
+  --bs-soft-primary: #{mix($primary, #000, 20%)};
+  // --bs-soft-primary: #{rgba($primary, 0.15)};
+  --bs-soft-secondary: #{mix($smoke, #000, 20%)};
+  --bs-soft-success: #{mix($green, #000, 20%)};
+  --bs-soft-info: #{mix($cyan, #000, 20%)};
+  --bs-soft-warning: #{mix($yellow, #000, 20%)};
+  --bs-soft-danger: #{mix($danger, #000, 20%)};
+
+  // Special handling for Light/Dark to ensure visibility
+  --bs-soft-light: #{mix($gray, #000, 15%)}; // Very faint gray
+  --bs-soft-dark: #{mix($black, #000, 15%)}; // Light gray
+
+  // --- Specific Palette Colors ---
+  --bs-soft-red: #{mix($red, #000, 20%)};
+  --bs-soft-green: #{mix($green, #000, 20%)};
+  --bs-soft-pink: #{mix($pink, #000, 20%)};
+  --bs-soft-purple: #{mix($purple, #000, 20%)};
+  --bs-soft-violet: #{mix($violet, #000, 20%)};
+  --bs-soft-indigo: #{mix($indigo, #000, 20%)};
+  --bs-soft-blue: #{mix($blue, #000, 20%)};
+  --bs-soft-sky: #{mix($sky, #000, 20%)};
+  --bs-soft-cyan: #{mix($cyan, #000, 20%)};
+  --bs-soft-teal: #{mix($teal, #000, 20%)};
+  --bs-soft-neon: #{mix($neon, #000, 20%)};
+  --bs-soft-lime: #{mix($lime, #000, 20%)};
+  --bs-soft-sun: #{mix($sun, #000, 20%)};
+  --bs-soft-yellow: #{mix($yellow, #000, 20%)};
+  --bs-soft-orange: #{mix($orange, #000, 20%)};
+  --bs-soft-pumpkin: #{mix($pumpkin, #000, 20%)};
+  --bs-soft-brown: #{mix($brown, #000, 20%)};
+  --bs-soft-gold: #{mix($gold, #000, 20%)};
+  --bs-soft-smoke: #{mix($smoke, #000, 20%)};
+  --bs-soft-gray: #{mix($gray, #000, 20%)};
+  /* ---/ EXTRA FOR SOFT COLORS /--- */
+
+
+  /* --- HK-JAMAPACK CUSTOM APP VARIABLES (DARK) --- */
+  --hk-bg-primary: #212529; // Dark primary bg
+  --hk-bg-primary-rgb: #{to-rgb(#212529)};
+  --hk-bg-secondary: #343a40; // Dark secondary
+  --hk-bg-tertiary: #495057;
+  --hk-bg-hover: #2a2e32; // Dark hover
+  --hk-select-primary: #{$primary_dark_5}; // Dark select
+
+  --hk-text-primary: #{$gray_light_1}; // Light text
+  --hk-text-secondary: #{$gray_light_3};
+  --hk-text-tertiary: #{$gray_light_5};
+  --hk-text-on-dark-bg: #{$black_2}; // Dark text on light accents
+  --hk-text-primary-rgb: #{to-rgb($gray_light_2)};
+  --hk-text-secondary-rgb: #{to-rgb($gray_light_3)};
+  --hk-text-tertiary-rgb: #{to-rgb($gray_light_5)};
+
+  --hk-border-primary: #35393F; // Dark borders
+  --hk-border-secondary: #{$gray_dark_3};
+  --hk-border-tertiary: #{$gray_dark_4};
+  --hk-scrim-bg: #{$white}; // Light scrim
+  --hk-shadow-rgb: #{to-rgb($white)};
+
+  // -- Menu / Sidebar Specific (Dark)
+  --hk-menu-bg: #212529;
+  --hk-menu-text: #{$gray_light_1};
+  --hk-menu-border: #35393F;
+  --hk-menu-item-active-bg: #{rgba($primary_dark_1, 0.15)};
+  --hk-menu-item-active-text: #{$primary_light_1};
+  --hk-menu-icon-color: #{$gray_light_3};
+  --hk-menu-arrow-color: #{rgba($gray_light_1, 0.3)};
+  --hk-menu-header-text: #{$gray_light_3};
+
+
+
+  // ********************************** For Background colors (.bg) Start ********************************** //
+  @each $name, $color in $jampack-colors {
+    // Base Color (Slightly dimmed for dark mode to reduce eye strain)
+    --bs-bg-#{$name}: #{mix($black_2, $color, 15%)};
+
+    // INVERTED LOGIC FOR DARK MODE:
+    // "Light" classes become Dark backgrounds (Surface colors)
+    // We mix with $black_2 (Your dark bg) to make them look like "Glass"
+
+    --bs-bg-#{$name}-light-5: #{mix($black_1, $color, 88%)}; // Deepest background
+    --bs-bg-#{$name}-light-4: #{mix($black_1, $color, 80%)};
+    --bs-bg-#{$name}-light-3: #{mix($black_1, $color, 70%)};
+    --bs-bg-#{$name}-light-2: #{mix($black_1, $color, 60%)};
+    --bs-bg-#{$name}-light-1: #{mix($black_1, $color, 50%)}; // Brightest background
+
+    // "Dark" classes become lighter or stay dark depending on usage. 
+    // Usually, we keep them dark but visible.
+    --bs-bg-#{$name}-dark-1: #{mix($black_1, $color, 40%)};
+    --bs-bg-#{$name}-dark-2: #{mix($black_1, $color, 30%)};
+    --bs-bg-#{$name}-dark-3: #{mix($black_1, $color, 20%)};
+    --bs-bg-#{$name}-dark-4: #{mix($black_1, $color, 10%)};
+    --bs-bg-#{$name}-dark-5: #{$color}; // Pure color
+  }
+
+  // ********************************** For Background colors (.bg) End ********************************** //
+}

@@ -1,0 +1,126 @@
+// toast.scss
+
+.Toastify__toast {
+    box-shadow: none;
+    // box-shadow: var(--bs-box-shadow) !important; // Uses your shadow variable
+    border-radius: 0.5rem;
+    min-height: auto;
+    font-family: var(--bs-body-font-family); // Uses your font variable
+    font-size: 0.875rem;
+    line-height: 1.3;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid transparent; // Prepares border for the theme colors
+}
+
+// LIGHT THEME (Soft Colors)
+// This applies when you use theme="light" in your ToastContainer
+.Toastify__toast-theme--light {
+
+    .Toastify__close-button {
+        color: inherit;
+        opacity: 0.7;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+
+    &.Toastify__toast-icon {
+        color: inherit;
+    }
+
+    // DEFAULT / PRIMARY
+    &.Toastify__toast--default {
+        background: var(--bs-soft-primary); // Maps to light_5 mix
+        color: var(--bs-primary);
+        border-color: rgba(var(--bs-primary-rgb), 0.3);
+
+        // Progress Bar
+        .Toastify__progress-bar {
+            background: var(--bs-primary);
+        }
+    }
+
+    // INFO
+    &.Toastify__toast--info {
+        background: var(--bs-soft-info);
+        color: var(--bs-info-text-emphasis); // Uses emphasis for better contrast
+        border-color: rgba(var(--bs-info-rgb), 0.3);
+
+        .Toastify__progress-bar {
+            background: var(--bs-info);
+        }
+    }
+
+    // SUCCESS
+    &.Toastify__toast--success {
+        background: var(--bs-soft-success);
+        color: var(--bs-bg-success-dark-3);
+        border-color: rgba(var(--bs-success-rgb), 0.3);
+
+        .Toastify__progress-bar {
+            background: var(--bs-success);
+        }
+    }
+
+    // WARNING
+    &.Toastify__toast--warning {
+        background: var(--bs-soft-warning);
+        color: var(--bs-warning-text-emphasis);
+        border-color: rgba(var(--bs-warning-rgb), 0.3);
+
+        .Toastify__progress-bar {
+            background: var(--bs-warning);
+        }
+    }
+
+    // ERROR (DANGER)
+    &.Toastify__toast--error {
+        background: var(--bs-soft-danger);
+        color: var(--bs-danger-text-emphasis);
+        border-color: rgba(var(--bs-danger-rgb), 0.3);
+
+        .Toastify__progress-bar {
+            background: var(--bs-danger);
+        }
+    }
+}
+
+// COLORED THEME (Solid Colors)
+// This applies when you use theme="colored" in your ToastContainer
+.Toastify__toast-theme--colored {
+
+    // In 'colored' mode, we generally want white text on solid backgrounds
+
+    &.Toastify__toast--default {
+        background: var(--bs-primary);
+        color: var(--bs-white);
+    }
+
+    &.Toastify__toast--info {
+        background: var(--bs-info);
+        color: var(--bs-white);
+    }
+
+    &.Toastify__toast--success {
+        background: var(--bs-success);
+        color: var(--bs-white);
+    }
+
+    &.Toastify__toast--warning {
+        background: var(--bs-warning);
+        color: var(--bs-white); // White on yellow provides good contrast for your palette
+    }
+
+    &.Toastify__toast--error {
+        background: var(--bs-danger);
+        color: var(--bs-white);
+    }
+
+    // Ensure close button is visible on solid backgrounds
+    .Toastify__close-button {
+        color: var(--bs-white);
+        opacity: 0.8;
+    }
+}

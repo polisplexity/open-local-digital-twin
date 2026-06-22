@@ -1,0 +1,2298 @@
+{
+  "generatedAt": "2026-05-23T17:12:53.497Z",
+  "source": {
+    "routeFile": "server/index.mjs + server/routes/*.mjs",
+    "contractFile": "server/tools/product-capability-contract.mjs",
+    "documentation": "docs/PRODUCT_CAPABILITY_MATRIX_2026-05-16.md"
+  },
+  "routeSummary": {
+    "total": 145,
+    "byFamily": {
+      "admin-fiware": 5,
+      "admin-layers": 13,
+      "admin": 17,
+      "app": 3,
+      "auth": 7,
+      "capabilities": 2,
+      "density-grid": 2,
+      "health": 1,
+      "live-base": 3,
+      "live-features": 2,
+      "live-tiles": 1,
+      "live": 47,
+      "provider-fiware": 1,
+      "provider-jobs": 8,
+      "provider-upload": 3,
+      "provider": 1,
+      "science-report": 2,
+      "semantic-pack-report": 2,
+      "society-report": 2,
+      "standards-dcat": 2,
+      "standards-ngsi": 2,
+      "standards-ogc": 8,
+      "viewer-shell": 9,
+      "viewer-summary": 2
+    },
+    "byMethod": {
+      "GET": 102,
+      "POST": 42,
+      "PUT": 1
+    }
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/admin/fiware/connections",
+      "family": "admin-fiware",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/fiware/connections",
+      "family": "admin-fiware",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/fiware/connections/:connectionKey/subscriptions",
+      "family": "admin-fiware",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/fiware/connections/:connectionKey/sync",
+      "family": "admin-fiware",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/fiware/sync-jobs",
+      "family": "admin-fiware",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/cities/:cityId/layers",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/accept-authority",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/bim-assets/:bundleId/:assetName",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/bim-payload",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/ingest-cityjson",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/ingest-csv",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/ingest-geojson",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/ingest-ifc",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/ingest-ogc-features",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/ingest-overture-buildings",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/ingest-stac",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/register-package",
+      "family": "admin-layers",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/cities",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/building-conflation/refresh",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/ingest-base-cache",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/cities/:cityId/layer-ingestion-jobs",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/preload",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/cities/:cityId/production-plan",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/cities/:cityId/storage",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/upsert",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/city-caches",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/providers",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/providers",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/workflow-runs",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/workflow-runs/:runId",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/workflow-runs/:runId/approvals/:approvalKey/decision",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/workflows",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/workflows/:workflowKey/runs",
+      "family": "admin",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "family": "app",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/platform/context",
+      "family": "app",
+      "authenticated": false
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard",
+      "family": "app",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "family": "auth",
+      "authenticated": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "family": "auth",
+      "authenticated": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/request-reset",
+      "family": "auth",
+      "authenticated": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/reset-password",
+      "family": "auth",
+      "authenticated": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/session",
+      "family": "auth",
+      "authenticated": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/signup-request",
+      "family": "auth",
+      "authenticated": false
+    },
+    {
+      "method": "GET",
+      "path": "/auth/activate",
+      "family": "auth",
+      "authenticated": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/capabilities",
+      "family": "capabilities",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/capabilities",
+      "family": "capabilities",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/density-grid",
+      "family": "density-grid",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/density-grid",
+      "family": "density-grid",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "family": "health",
+      "authenticated": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/base",
+      "family": "live-base",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/adazi/base",
+      "family": "live-base",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/base",
+      "family": "live-base",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/features",
+      "family": "live-features",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/features",
+      "family": "live-features",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/tiles/:z/:x/:y.mvt",
+      "family": "live-tiles",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/bim-assets/:layerKey/:bundleId/:assetName",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/bim-layers",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/building-coverage",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/layer-capabilities",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/map-manifest",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/openapi.json",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/operations/metrics-summary",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/operations/report",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/selection-summary",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/selection-units",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/semantic-query-contract",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/semantic-query",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/live/:cityId/semantic-query",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/standards/context/:contextKey",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/twin-query-contract",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/twin-query-events",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/twin-query-tiles/:z/:x/:y.mvt",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/twin-query",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/live/:cityId/twin-query",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/viewer-manifest",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/viewer-share-manifests",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/live/:cityId/viewer-share-manifests",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/viewer-share-manifests/:shareKey",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/live/:cityId/viewer-share-manifests/:shareKey/publish",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/bim-layers",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/building-coverage",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/layer-capabilities",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/map-manifest",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/openapi.json",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/operations/metrics-summary",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/operations/report",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/selection-summary",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/selection-units",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/semantic-query-contract",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/semantic-query",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/live/current/semantic-query",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/standards/context/:contextKey",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/twin-query-contract",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/twin-query-events",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/twin-query-tiles/:z/:x/:y.mvt",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/twin-query",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/live/current/twin-query",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/viewer-manifest",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/viewer-share-manifests",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/live/current/viewer-share-manifests",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/viewer-share-manifests/:shareKey",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/live/current/viewer-share-manifests/:shareKey/publish",
+      "family": "live",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/provider/v1/fiware/observations",
+      "family": "provider-fiware",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/ingestion-jobs",
+      "family": "provider-jobs",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cities/:cityId/layers/:layerKey/ingestion-jobs/queue",
+      "family": "provider-jobs",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/ingestion-jobs/:jobId",
+      "family": "provider-jobs",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/ingestion-jobs/:jobId/cancel",
+      "family": "provider-jobs",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/ingestion-jobs/:jobId/report",
+      "family": "provider-jobs",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/ingestion-jobs/:jobId/retry",
+      "family": "provider-jobs",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/ingestion-jobs/:jobId/run",
+      "family": "provider-jobs",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/provider/v1/cities/:cityId/layers/:layerKey/jobs",
+      "family": "provider-jobs",
+      "authenticated": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/provider/v1/cities/:cityId/layers/:layerKey/upload-intents",
+      "family": "provider-upload",
+      "authenticated": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/provider/v1/uploads/:uploadId",
+      "family": "provider-upload",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/provider/v1/uploads/:uploadId/source",
+      "family": "provider-upload",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/provider/v1/status",
+      "family": "provider",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/science/urban-report",
+      "family": "science-report",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/science/urban-report",
+      "family": "science-report",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/semantic-packs/:packKey/report",
+      "family": "semantic-pack-report",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/semantic-packs/:packKey/report",
+      "family": "semantic-pack-report",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/society/report",
+      "family": "society-report",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/society/report",
+      "family": "society-report",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/standards/dcat",
+      "family": "standards-dcat",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/standards/dcat",
+      "family": "standards-dcat",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/standards/ngsi-ld/entities",
+      "family": "standards-ngsi",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/standards/ngsi-ld/entities",
+      "family": "standards-ngsi",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/standards/ogc",
+      "family": "standards-ogc",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/standards/ogc/collections",
+      "family": "standards-ogc",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/standards/ogc/collections/:collectionKey/items",
+      "family": "standards-ogc",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/standards/ogc/conformance",
+      "family": "standards-ogc",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/standards/ogc",
+      "family": "standards-ogc",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/standards/ogc/collections",
+      "family": "standards-ogc",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/standards/ogc/collections/:collectionKey/items",
+      "family": "standards-ogc",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/standards/ogc/conformance",
+      "family": "standards-ogc",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/live/:cityId/3d",
+      "family": "viewer-shell",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/live/:cityId/immersive",
+      "family": "viewer-shell",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/live/:cityId/map",
+      "family": "viewer-shell",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/live/adazi/3d",
+      "family": "viewer-shell",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/live/adazi/immersive",
+      "family": "viewer-shell",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/live/adazi/map",
+      "family": "viewer-shell",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/live/current/3d",
+      "family": "viewer-shell",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/live/current/immersive",
+      "family": "viewer-shell",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/live/current/map",
+      "family": "viewer-shell",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/:cityId/viewer-summary",
+      "family": "viewer-summary",
+      "authenticated": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/live/current/viewer-summary",
+      "family": "viewer-summary",
+      "authenticated": true
+    }
+  ],
+  "capabilities": [
+    {
+      "key": "open-data-base-twin",
+      "title": "Open-data base twin",
+      "phase": 10,
+      "status": "partial",
+      "promise": "Any city can start from public/open data.",
+      "standards": [
+        "OSM/Overpass",
+        "Overture",
+        "DCAT",
+        "PROV",
+        "OGC API Features"
+      ],
+      "databaseSchemas": [
+        "ldt_catalog",
+        "ldt_prov",
+        "ldt_core"
+      ],
+      "apiFamilies": [
+        "live-base",
+        "live-features",
+        "live-tiles"
+      ],
+      "uiSurface": "cockpit",
+      "productGap": "Open-data refresh is still script/admin driven and needs a city-operable workflow with progress and quality reporting.",
+      "apiCoverage": [
+        {
+          "family": "live-base",
+          "present": true,
+          "routeCount": 3
+        },
+        {
+          "family": "live-features",
+          "present": true,
+          "routeCount": 2
+        },
+        {
+          "family": "live-tiles",
+          "present": true,
+          "routeCount": 1
+        }
+      ]
+    },
+    {
+      "key": "consolidated-city-inventory",
+      "title": "Consolidated city inventory",
+      "phase": 10,
+      "status": "implemented-partial-ui",
+      "promise": "The city is one inventory enriched by source evidence, not separate OSM/Overture UI truth.",
+      "standards": [
+        "PROV-O concepts",
+        "OGC API Features",
+        "NGSI-LD"
+      ],
+      "databaseSchemas": [
+        "ldt_core",
+        "ldt_prov"
+      ],
+      "apiFamilies": [
+        "live-features",
+        "standards-ogc",
+        "standards-ngsi"
+      ],
+      "uiSurface": "cockpit",
+      "productGap": "Dedicated inventory and entity-evidence APIs/UI are still missing.",
+      "apiCoverage": [
+        {
+          "family": "live-features",
+          "present": true,
+          "routeCount": 2
+        },
+        {
+          "family": "standards-ogc",
+          "present": true,
+          "routeCount": 8
+        },
+        {
+          "family": "standards-ngsi",
+          "present": true,
+          "routeCount": 2
+        }
+      ]
+    },
+    {
+      "key": "source-catalog",
+      "title": "Source catalog",
+      "phase": 10,
+      "status": "implemented-partial-ui",
+      "promise": "Every source has license, distribution, quality, attribution, and spatial metadata.",
+      "standards": [
+        "DCAT",
+        "ODRL"
+      ],
+      "databaseSchemas": [
+        "ldt_catalog",
+        "ldt_interop"
+      ],
+      "apiFamilies": [
+        "standards-dcat"
+      ],
+      "uiSurface": "missing",
+      "productGap": "Need a source catalog UI and access-right/license cleanup.",
+      "apiCoverage": [
+        {
+          "family": "standards-dcat",
+          "present": true,
+          "routeCount": 2
+        }
+      ]
+    },
+    {
+      "key": "provenance-evidence",
+      "title": "Provenance and evidence",
+      "phase": 10,
+      "status": "implemented-partial-api",
+      "promise": "Every consolidated entity can be traced back to source evidence and review decisions.",
+      "standards": [
+        "PROV-O concepts"
+      ],
+      "databaseSchemas": [
+        "ldt_prov"
+      ],
+      "apiFamilies": [
+        "standards-ogc",
+        "standards-ngsi"
+      ],
+      "uiSurface": "missing",
+      "productGap": "Need entity evidence endpoint and analyst evidence panel.",
+      "apiCoverage": [
+        {
+          "family": "standards-ogc",
+          "present": true,
+          "routeCount": 8
+        },
+        {
+          "family": "standards-ngsi",
+          "present": true,
+          "routeCount": 2
+        }
+      ]
+    },
+    {
+      "key": "standards-publication",
+      "title": "Standards publication",
+      "phase": 10,
+      "status": "implemented-partial-ui",
+      "promise": "The twin exposes standards-native outputs, not just internal JSON.",
+      "standards": [
+        "DCAT JSON-LD",
+        "NGSI-LD",
+        "OGC API Features",
+        "ODRL"
+      ],
+      "databaseSchemas": [
+        "ldt_interop"
+      ],
+      "apiFamilies": [
+        "standards-dcat",
+        "standards-ngsi",
+        "standards-ogc"
+      ],
+      "uiSurface": "missing",
+      "productGap": "Need standards module with endpoint status, examples, explorer links, and versioning.",
+      "apiCoverage": [
+        {
+          "family": "standards-dcat",
+          "present": true,
+          "routeCount": 2
+        },
+        {
+          "family": "standards-ngsi",
+          "present": true,
+          "routeCount": 2
+        },
+        {
+          "family": "standards-ogc",
+          "present": true,
+          "routeCount": 8
+        }
+      ]
+    },
+    {
+      "key": "fiware-live-context",
+      "title": "FIWARE live context",
+      "phase": 10,
+      "status": "partial",
+      "promise": "FIWARE is the live context/interconnection layer over durable PostGIS inventory.",
+      "standards": [
+        "NGSI-LD",
+        "FIWARE Orion-LD/Scorpio boundary"
+      ],
+      "databaseSchemas": [
+        "ldt_fiware",
+        "ldt_interop"
+      ],
+      "apiFamilies": [
+        "admin-fiware",
+        "provider-fiware"
+      ],
+      "uiSurface": "admin",
+      "productGap": "Need real broker profile, resumable sync, auth, retries, and operator UI.",
+      "apiCoverage": [
+        {
+          "family": "admin-fiware",
+          "present": true,
+          "routeCount": 5
+        },
+        {
+          "family": "provider-fiware",
+          "present": true,
+          "routeCount": 1
+        }
+      ]
+    },
+    {
+      "key": "provider-connectors",
+      "title": "Provider and private-data connectors",
+      "phase": 10,
+      "status": "partial",
+      "promise": "City, provider, flood, fire, satellite, IoT, BIM, and other datasets can attach through APIs.",
+      "standards": [
+        "GeoJSON",
+        "CSV",
+        "OGC API Features",
+        "WFS",
+        "STAC",
+        "CityJSON",
+        "IFC",
+        "GeoPackage",
+        "Shapefile"
+      ],
+      "databaseSchemas": [
+        "public",
+        "ldt_catalog",
+        "ldt_prov"
+      ],
+      "apiFamilies": [
+        "admin-layers",
+        "provider-upload",
+        "provider-jobs"
+      ],
+      "uiSurface": "admin",
+      "productGap": "Need validation/publication gates and a product-grade provider onboarding flow.",
+      "apiCoverage": [
+        {
+          "family": "admin-layers",
+          "present": true,
+          "routeCount": 13
+        },
+        {
+          "family": "provider-upload",
+          "present": true,
+          "routeCount": 3
+        },
+        {
+          "family": "provider-jobs",
+          "present": true,
+          "routeCount": 8
+        }
+      ]
+    },
+    {
+      "key": "viewer-aggregates",
+      "title": "Large-city viewer aggregates",
+      "phase": 10,
+      "status": "implemented-partial-ui",
+      "promise": "Large cities use cached summaries, density grids, viewport windows, and tiles instead of full-city browser payloads.",
+      "standards": [
+        "Internal viewer performance contract"
+      ],
+      "databaseSchemas": [
+        "ldt_viewer"
+      ],
+      "apiFamilies": [
+        "viewer-summary",
+        "density-grid",
+        "live-features",
+        "live-tiles"
+      ],
+      "uiSurface": "cockpit",
+      "productGap": "Cockpit indicators still need to come only from LDT-native summaries/science reports.",
+      "apiCoverage": [
+        {
+          "family": "viewer-summary",
+          "present": true,
+          "routeCount": 2
+        },
+        {
+          "family": "density-grid",
+          "present": true,
+          "routeCount": 2
+        },
+        {
+          "family": "live-features",
+          "present": true,
+          "routeCount": 2
+        },
+        {
+          "family": "live-tiles",
+          "present": true,
+          "routeCount": 1
+        }
+      ]
+    },
+    {
+      "key": "urban-science",
+      "title": "Urban science",
+      "phase": 10,
+      "status": "partial",
+      "promise": "City analytics are reproducible observations with methods, quality, uncertainty, and model contracts.",
+      "standards": [
+        "Urban science standard",
+        "Scaling models",
+        "Network metrics",
+        "Simulation/scenario contracts"
+      ],
+      "databaseSchemas": [
+        "ldt_science"
+      ],
+      "apiFamilies": [
+        "science-report"
+      ],
+      "uiSurface": "missing",
+      "productGap": "Need UI module and better population, district, graph, and calibration datasets.",
+      "apiCoverage": [
+        {
+          "family": "science-report",
+          "present": true,
+          "routeCount": 2
+        }
+      ]
+    },
+    {
+      "key": "society-culture",
+      "title": "Social, economic, and cultural layer",
+      "phase": 10,
+      "status": "partial",
+      "promise": "Social/cultural analysis is aggregate, privacy-safe, and source-quality explicit.",
+      "standards": [
+        "Privacy policy",
+        "Source-quality rules",
+        "Aggregate observation standard"
+      ],
+      "databaseSchemas": [
+        "ldt_society"
+      ],
+      "apiFamilies": [
+        "society-report"
+      ],
+      "uiSurface": "missing",
+      "productGap": "Need UI module, population grids, district aggregation, and privacy-aware public/private modes.",
+      "apiCoverage": [
+        {
+          "family": "society-report",
+          "present": true,
+          "routeCount": 2
+        }
+      ]
+    },
+    {
+      "key": "semantic-packs",
+      "title": "Semantic packs",
+      "phase": 10,
+      "status": "partial",
+      "promise": "Domain logic attaches as explicit service packs with rules, blocked claims, features, workflows, and exports.",
+      "standards": [
+        "Semantic pack manifest",
+        "Rules",
+        "Workflow/export contract"
+      ],
+      "databaseSchemas": [
+        "ldt_semantic"
+      ],
+      "apiFamilies": [
+        "semantic-pack-report"
+      ],
+      "uiSurface": "missing",
+      "productGap": "Need semantic-pack UI with review workflows and blocked operational claims.",
+      "apiCoverage": [
+        {
+          "family": "semantic-pack-report",
+          "present": true,
+          "routeCount": 2
+        }
+      ]
+    },
+    {
+      "key": "api-observability",
+      "title": "API observability",
+      "phase": 12,
+      "status": "schema-only",
+      "promise": "Operators can see API usage, latency, errors, route family, city, and role.",
+      "standards": [
+        "Prometheus/Grafana-ready metrics",
+        "Request IDs"
+      ],
+      "databaseSchemas": [
+        "ldt_ops"
+      ],
+      "apiFamilies": [
+        "missing"
+      ],
+      "uiSurface": "missing",
+      "productGap": "Need middleware, metrics endpoint, Grafana dashboard, and API usage panel.",
+      "apiCoverage": [
+        {
+          "family": "missing",
+          "present": false,
+          "routeCount": 0
+        }
+      ]
+    },
+    {
+      "key": "open-source-install",
+      "title": "One-city open-source install",
+      "phase": 14,
+      "status": "documented-partial",
+      "promise": "A city can install one backend and lightweight UI for its own base twin.",
+      "standards": [
+        "Docker Compose",
+        "PostGIS",
+        "Migration/runbook contract"
+      ],
+      "databaseSchemas": [
+        "all-runtime-schemas"
+      ],
+      "apiFamilies": [
+        "health",
+        "admin",
+        "live"
+      ],
+      "uiSurface": "not-packaged",
+      "productGap": "Need clean one-city setup, env template, create-city, backup/restore, smoke tests, and wiki.",
+      "apiCoverage": [
+        {
+          "family": "health",
+          "present": true,
+          "routeCount": 1
+        },
+        {
+          "family": "admin",
+          "present": true,
+          "routeCount": 17
+        },
+        {
+          "family": "live",
+          "present": true,
+          "routeCount": 47
+        }
+      ]
+    }
+  ],
+  "cityCapabilities": {
+    "kharkiv": {
+      "configured": true,
+      "ok": true,
+      "city": {
+        "id": "kharkiv",
+        "name": "Kharkiv",
+        "country": "Ukraine",
+        "country_code": "ua",
+        "region": "Kharkiv Oblast",
+        "metadata": {
+          "phase": "phase-2-source-native-reingest",
+          "reference": {
+            "town": {
+              "title": "Kharkiv",
+              "extract": "Kharkiv, also known as Kharkov, is the second-largest city in Ukraine. Located in the northeast of the country, it is the largest city of the historic region of Sloboda Ukraine. Kharkiv is the administrative center of Kharkiv Oblast and Kharkiv Raion. Prior to the Russian invasion of Ukraine in early 2022, it had an estimated population of 1,421,125.",
+              "pageUrl": "https://en.wikipedia.org/wiki/Kharkiv",
+              "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/%D0%A3%D1%81%D0%BF%D0%B5%D0%BD%D1%81%D1%8C%D0%BA%D0%B8%D0%B9_%D1%81%D0%BE%D0%B1%D0%BE%D1%80_%D0%B2%D0%B7%D0%B8%D0%BC%D0%BA%D1%83%2C_%D0%B0%D0%B5%D1%80%D0%BE%D1%84%D0%BE%D1%82%D0%BE.jpg/3840px-%D0%A3%D1%81%D0%BF%D0%B5%D0%BD%D1%81%D1%8C%D0%BA%D0%B8%D0%B9_%D1%81%D0%BE%D0%B1%D0%BE%D1%80_%D0%B2%D0%B7%D0%B8%D0%BC%D0%BA%D1%83%2C_%D0%B0%D0%B5%D1%80%D0%BE%D1%84%D0%BE%D1%82%D0%BE.jpg",
+              "coordinates": {
+                "lat": 49.9925,
+                "lon": 36.23111111
+              },
+              "description": "City in Kharkiv Oblast, Ukraine"
+            },
+            "municipality": {
+              "title": "Kharkiv",
+              "extract": "Kharkiv, also known as Kharkov, is the second-largest city in Ukraine. Located in the northeast of the country, it is the largest city of the historic region of Sloboda Ukraine. Kharkiv is the administrative center of Kharkiv Oblast and Kharkiv Raion. Prior to the Russian invasion of Ukraine in early 2022, it had an estimated population of 1,421,125.",
+              "pageUrl": "https://en.wikipedia.org/wiki/Kharkiv",
+              "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/%D0%A3%D1%81%D0%BF%D0%B5%D0%BD%D1%81%D1%8C%D0%BA%D0%B8%D0%B9_%D1%81%D0%BE%D0%B1%D0%BE%D1%80_%D0%B2%D0%B7%D0%B8%D0%BC%D0%BA%D1%83%2C_%D0%B0%D0%B5%D1%80%D0%BE%D1%84%D0%BE%D1%82%D0%BE.jpg/3840px-%D0%A3%D1%81%D0%BF%D0%B5%D0%BD%D1%81%D1%8C%D0%BA%D0%B8%D0%B9_%D1%81%D0%BE%D0%B1%D0%BE%D1%80_%D0%B2%D0%B7%D0%B8%D0%BC%D0%BA%D1%83%2C_%D0%B0%D0%B5%D1%80%D0%BE%D1%84%D0%BE%D1%82%D0%BE.jpg",
+              "coordinates": {
+                "lat": 49.9925,
+                "lon": 36.23111111
+              },
+              "description": "City in Kharkiv Oblast, Ukraine"
+            }
+          },
+          "twinLabel": "Kharkiv Digital Twin",
+          "nominatimQuery": "Kharkiv, Ukraine",
+          "wikipediaTownPage": "Kharkiv",
+          "legacyRuntimeSource": "public.cities",
+          "sourcePayloadVersion": 7,
+          "wikipediaMunicipalityPage": "Kharkiv"
+        }
+      },
+      "cityId": "kharkiv",
+      "generatedAt": "2026-05-23T17:12:53.497Z",
+      "readiness": {
+        "status": "partial",
+        "warnings": [
+          "900 road entities are available. Large-city road coverage is still weak if it is tiny relative to the built fabric.",
+          "180 green-blue entities are available. Classification depth is still a Phase 11/13 task.",
+          "Workspace, map, municipal 3D, and public immersive surfaces are split into the intended product architecture, but Phase 13 visual hardening is still in progress."
+        ]
+      },
+      "readinessChecks": [
+        {
+          "key": "single-city-demo-posture",
+          "label": "Single-city demo posture",
+          "category": "product",
+          "status": "ready",
+          "summary": "Kharkiv is the active demo city for the current product path.",
+          "evidence": {
+            "cityId": "kharkiv"
+          },
+          "action": null
+        },
+        {
+          "key": "source-coverage",
+          "label": "Open source coverage",
+          "category": "sources",
+          "status": "ready",
+          "summary": "9 datasets and 293076 source features are attached to this city.",
+          "evidence": {
+            "datasets": 9,
+            "sourceFeatures": 293076,
+            "sourceLayers": {
+              "buildings": 900,
+              "center": 1,
+              "facilities": 240,
+              "greenBlue": 180,
+              "overture-buildings": 290821,
+              "places": 34,
+              "roads": 900
+            }
+          },
+          "action": null
+        },
+        {
+          "key": "building-inventory",
+          "label": "Building inventory",
+          "category": "inventory",
+          "status": "ready",
+          "summary": "230641 consolidated building entities are available.",
+          "evidence": {
+            "buildings": 230641,
+            "overtureAvailable": true
+          },
+          "action": null
+        },
+        {
+          "key": "road-network-coverage",
+          "label": "Road network coverage",
+          "category": "inventory",
+          "status": "partial",
+          "summary": "900 road entities are available. Large-city road coverage is still weak if it is tiny relative to the built fabric.",
+          "evidence": {
+            "roads": 900,
+            "buildings": 230641,
+            "roadToBuildingRatio": 0.003902168304854731
+          },
+          "action": "Reingest roads with a heavy-city profile or add a stronger open road source."
+        },
+        {
+          "key": "service-and-place-anchors",
+          "label": "Service and place anchors",
+          "category": "inventory",
+          "status": "ready",
+          "summary": "240 facilities and 35 places are available as city analyst anchors.",
+          "evidence": {
+            "facilities": 240,
+            "places": 35
+          },
+          "action": null
+        },
+        {
+          "key": "green-blue-coverage",
+          "label": "Green-blue coverage",
+          "category": "inventory",
+          "status": "partial",
+          "summary": "180 green-blue entities are available. Classification depth is still a Phase 11/13 task.",
+          "evidence": {
+            "greenBlueSystems": 180
+          },
+          "action": "Classify parks, water, forest, reserves, and public realm before environmental claims."
+        },
+        {
+          "key": "standards-publication",
+          "label": "Standards publication",
+          "category": "standards",
+          "status": "ready",
+          "summary": "231996 NGSI-LD projections, 5 OGC collections, and 9 DCAT datasets are generated.",
+          "evidence": {
+            "ngsiProjections": 231996,
+            "entities": 231996,
+            "ogcCollections": 5,
+            "datasets": 9
+          },
+          "action": null
+        },
+        {
+          "key": "science-society-semantic",
+          "label": "Science, society, and semantic reports",
+          "category": "analysis",
+          "status": "ready",
+          "summary": "10 science observations, 10 society observations, and 10 semantic indicators exist.",
+          "evidence": {
+            "scienceObservations": 10,
+            "societyObservations": 10,
+            "semanticIndicators": 10
+          },
+          "action": "Phase 11 must expose these as analyst modules instead of hiding them in backend reports."
+        },
+        {
+          "key": "workflow-readiness",
+          "label": "Workflow readiness",
+          "category": "operations",
+          "status": "ready",
+          "summary": "3 workflow definitions, 24 runs, and 0 pending approvals are recorded.",
+          "evidence": {
+            "workflowDefinitions": 3,
+            "workflowRuns": 24,
+            "pendingWorkflowApprovals": 0,
+            "approvedOrQueuedRuns": 10
+          },
+          "action": "Build the lightweight worker only after approval-gated APIs stay stable."
+        },
+        {
+          "key": "api-observability",
+          "label": "API observability",
+          "category": "operations",
+          "status": "ready",
+          "summary": "6088 API usage events are recorded for this city.",
+          "evidence": {
+            "apiEvents": 6088
+          },
+          "action": "Add request IDs, route-family metrics, Prometheus/Grafana export, and API usage UI in Phase 12."
+        },
+        {
+          "key": "ui-product-surface",
+          "label": "UI product surface",
+          "category": "ui",
+          "status": "construction",
+          "summary": "Workspace, map, municipal 3D, and public immersive surfaces are split into the intended product architecture, but Phase 13 visual hardening is still in progress.",
+          "evidence": {
+            "capabilitiesPage": true,
+            "workspaceStatus": "implemented-partial",
+            "mapStatus": "query-first-in-progress",
+            "municipal3dStatus": "in-progress",
+            "publicImmersiveStatus": "in-progress"
+          },
+          "action": "Finish Phase 13 visual smoke, query/share/embed UI polish, and signed/public embed policy before closing the visual rebuild."
+        }
+      ],
+      "readinessGaps": [
+        {
+          "key": "road-network-coverage",
+          "label": "Road network coverage",
+          "category": "inventory",
+          "status": "partial",
+          "summary": "900 road entities are available. Large-city road coverage is still weak if it is tiny relative to the built fabric.",
+          "evidence": {
+            "roads": 900,
+            "buildings": 230641,
+            "roadToBuildingRatio": 0.003902168304854731
+          },
+          "action": "Reingest roads with a heavy-city profile or add a stronger open road source."
+        },
+        {
+          "key": "green-blue-coverage",
+          "label": "Green-blue coverage",
+          "category": "inventory",
+          "status": "partial",
+          "summary": "180 green-blue entities are available. Classification depth is still a Phase 11/13 task.",
+          "evidence": {
+            "greenBlueSystems": 180
+          },
+          "action": "Classify parks, water, forest, reserves, and public realm before environmental claims."
+        },
+        {
+          "key": "ui-product-surface",
+          "label": "UI product surface",
+          "category": "ui",
+          "status": "construction",
+          "summary": "Workspace, map, municipal 3D, and public immersive surfaces are split into the intended product architecture, but Phase 13 visual hardening is still in progress.",
+          "evidence": {
+            "capabilitiesPage": true,
+            "workspaceStatus": "implemented-partial",
+            "mapStatus": "query-first-in-progress",
+            "municipal3dStatus": "in-progress",
+            "publicImmersiveStatus": "in-progress"
+          },
+          "action": "Finish Phase 13 visual smoke, query/share/embed UI polish, and signed/public embed policy before closing the visual rebuild."
+        }
+      ],
+      "readinessSummary": {
+        "ready": 8,
+        "partial": 2,
+        "blocked": 0,
+        "construction": 1,
+        "lab": 0,
+        "total": 11
+      },
+      "modules": {
+        "baseInventory": true,
+        "catalog": true,
+        "provenance": true,
+        "interop": true,
+        "fiware": true,
+        "viewerAggregates": true,
+        "urbanScience": true,
+        "societyCulture": true,
+        "semanticPacks": true,
+        "providerLayers": true,
+        "agenticWorkflows": true,
+        "apiObservability": true
+      },
+      "counts": {
+        "datasets": 9,
+        "sourceFeatures": 293076,
+        "entities": 231996,
+        "ngsiProjections": 231996,
+        "ogcCollections": 5,
+        "viewerSummaries": 1,
+        "densityCells": 264,
+        "scienceObservations": 10,
+        "societyObservations": 10,
+        "semanticPacks": 1,
+        "semanticIndicators": 10,
+        "fiwareConnections": 1,
+        "fiwareSyncJobs": 1,
+        "providerLayers": 13,
+        "ingestionJobs": 10,
+        "apiEvents": 6088,
+        "workflowDefinitions": 3,
+        "workflowRuns": 24,
+        "pendingWorkflowApprovals": 0
+      },
+      "productCapabilities": [
+        {
+          "key": "open-data-base-twin",
+          "title": "Open-data base twin",
+          "phase": 10,
+          "status": "partial",
+          "promise": "Any city can start from public/open data.",
+          "standards": [
+            "OSM/Overpass",
+            "Overture",
+            "DCAT",
+            "PROV",
+            "OGC API Features"
+          ],
+          "databaseSchemas": [
+            "ldt_catalog",
+            "ldt_prov",
+            "ldt_core"
+          ],
+          "apiFamilies": [
+            "live-base",
+            "live-features",
+            "live-tiles"
+          ],
+          "uiSurface": "cockpit",
+          "productGap": "Open-data refresh is still script/admin driven and needs a city-operable workflow with progress and quality reporting."
+        },
+        {
+          "key": "consolidated-city-inventory",
+          "title": "Consolidated city inventory",
+          "phase": 10,
+          "status": "implemented-partial-ui",
+          "promise": "The city is one inventory enriched by source evidence, not separate OSM/Overture UI truth.",
+          "standards": [
+            "PROV-O concepts",
+            "OGC API Features",
+            "NGSI-LD"
+          ],
+          "databaseSchemas": [
+            "ldt_core",
+            "ldt_prov"
+          ],
+          "apiFamilies": [
+            "live-features",
+            "standards-ogc",
+            "standards-ngsi"
+          ],
+          "uiSurface": "cockpit",
+          "productGap": "Dedicated inventory and entity-evidence APIs/UI are still missing."
+        },
+        {
+          "key": "source-catalog",
+          "title": "Source catalog",
+          "phase": 10,
+          "status": "implemented-partial-ui",
+          "promise": "Every source has license, distribution, quality, attribution, and spatial metadata.",
+          "standards": [
+            "DCAT",
+            "ODRL"
+          ],
+          "databaseSchemas": [
+            "ldt_catalog",
+            "ldt_interop"
+          ],
+          "apiFamilies": [
+            "standards-dcat"
+          ],
+          "uiSurface": "missing",
+          "productGap": "Need a source catalog UI and access-right/license cleanup."
+        },
+        {
+          "key": "provenance-evidence",
+          "title": "Provenance and evidence",
+          "phase": 10,
+          "status": "implemented-partial-api",
+          "promise": "Every consolidated entity can be traced back to source evidence and review decisions.",
+          "standards": [
+            "PROV-O concepts"
+          ],
+          "databaseSchemas": [
+            "ldt_prov"
+          ],
+          "apiFamilies": [
+            "standards-ogc",
+            "standards-ngsi"
+          ],
+          "uiSurface": "missing",
+          "productGap": "Need entity evidence endpoint and analyst evidence panel."
+        },
+        {
+          "key": "standards-publication",
+          "title": "Standards publication",
+          "phase": 10,
+          "status": "implemented-partial-ui",
+          "promise": "The twin exposes standards-native outputs, not just internal JSON.",
+          "standards": [
+            "DCAT JSON-LD",
+            "NGSI-LD",
+            "OGC API Features",
+            "ODRL"
+          ],
+          "databaseSchemas": [
+            "ldt_interop"
+          ],
+          "apiFamilies": [
+            "standards-dcat",
+            "standards-ngsi",
+            "standards-ogc"
+          ],
+          "uiSurface": "missing",
+          "productGap": "Need standards module with endpoint status, examples, explorer links, and versioning."
+        },
+        {
+          "key": "fiware-live-context",
+          "title": "FIWARE live context",
+          "phase": 10,
+          "status": "partial",
+          "promise": "FIWARE is the live context/interconnection layer over durable PostGIS inventory.",
+          "standards": [
+            "NGSI-LD",
+            "FIWARE Orion-LD/Scorpio boundary"
+          ],
+          "databaseSchemas": [
+            "ldt_fiware",
+            "ldt_interop"
+          ],
+          "apiFamilies": [
+            "admin-fiware",
+            "provider-fiware"
+          ],
+          "uiSurface": "admin",
+          "productGap": "Need real broker profile, resumable sync, auth, retries, and operator UI."
+        },
+        {
+          "key": "provider-connectors",
+          "title": "Provider and private-data connectors",
+          "phase": 10,
+          "status": "partial",
+          "promise": "City, provider, flood, fire, satellite, IoT, BIM, and other datasets can attach through APIs.",
+          "standards": [
+            "GeoJSON",
+            "CSV",
+            "OGC API Features",
+            "WFS",
+            "STAC",
+            "CityJSON",
+            "IFC",
+            "GeoPackage",
+            "Shapefile"
+          ],
+          "databaseSchemas": [
+            "public",
+            "ldt_catalog",
+            "ldt_prov"
+          ],
+          "apiFamilies": [
+            "admin-layers",
+            "provider-upload",
+            "provider-jobs"
+          ],
+          "uiSurface": "admin",
+          "productGap": "Need validation/publication gates and a product-grade provider onboarding flow."
+        },
+        {
+          "key": "viewer-aggregates",
+          "title": "Large-city viewer aggregates",
+          "phase": 10,
+          "status": "implemented-partial-ui",
+          "promise": "Large cities use cached summaries, density grids, viewport windows, and tiles instead of full-city browser payloads.",
+          "standards": [
+            "Internal viewer performance contract"
+          ],
+          "databaseSchemas": [
+            "ldt_viewer"
+          ],
+          "apiFamilies": [
+            "viewer-summary",
+            "density-grid",
+            "live-features",
+            "live-tiles"
+          ],
+          "uiSurface": "cockpit",
+          "productGap": "Cockpit indicators still need to come only from LDT-native summaries/science reports."
+        },
+        {
+          "key": "urban-science",
+          "title": "Urban science",
+          "phase": 10,
+          "status": "partial",
+          "promise": "City analytics are reproducible observations with methods, quality, uncertainty, and model contracts.",
+          "standards": [
+            "Urban science standard",
+            "Scaling models",
+            "Network metrics",
+            "Simulation/scenario contracts"
+          ],
+          "databaseSchemas": [
+            "ldt_science"
+          ],
+          "apiFamilies": [
+            "science-report"
+          ],
+          "uiSurface": "missing",
+          "productGap": "Need UI module and better population, district, graph, and calibration datasets."
+        },
+        {
+          "key": "society-culture",
+          "title": "Social, economic, and cultural layer",
+          "phase": 10,
+          "status": "partial",
+          "promise": "Social/cultural analysis is aggregate, privacy-safe, and source-quality explicit.",
+          "standards": [
+            "Privacy policy",
+            "Source-quality rules",
+            "Aggregate observation standard"
+          ],
+          "databaseSchemas": [
+            "ldt_society"
+          ],
+          "apiFamilies": [
+            "society-report"
+          ],
+          "uiSurface": "missing",
+          "productGap": "Need UI module, population grids, district aggregation, and privacy-aware public/private modes."
+        },
+        {
+          "key": "semantic-packs",
+          "title": "Semantic packs",
+          "phase": 10,
+          "status": "partial",
+          "promise": "Domain logic attaches as explicit service packs with rules, blocked claims, features, workflows, and exports.",
+          "standards": [
+            "Semantic pack manifest",
+            "Rules",
+            "Workflow/export contract"
+          ],
+          "databaseSchemas": [
+            "ldt_semantic"
+          ],
+          "apiFamilies": [
+            "semantic-pack-report"
+          ],
+          "uiSurface": "missing",
+          "productGap": "Need semantic-pack UI with review workflows and blocked operational claims."
+        },
+        {
+          "key": "api-observability",
+          "title": "API observability",
+          "phase": 12,
+          "status": "schema-only",
+          "promise": "Operators can see API usage, latency, errors, route family, city, and role.",
+          "standards": [
+            "Prometheus/Grafana-ready metrics",
+            "Request IDs"
+          ],
+          "databaseSchemas": [
+            "ldt_ops"
+          ],
+          "apiFamilies": [
+            "missing"
+          ],
+          "uiSurface": "missing",
+          "productGap": "Need middleware, metrics endpoint, Grafana dashboard, and API usage panel."
+        },
+        {
+          "key": "open-source-install",
+          "title": "One-city open-source install",
+          "phase": 14,
+          "status": "documented-partial",
+          "promise": "A city can install one backend and lightweight UI for its own base twin.",
+          "standards": [
+            "Docker Compose",
+            "PostGIS",
+            "Migration/runbook contract"
+          ],
+          "databaseSchemas": [
+            "all-runtime-schemas"
+          ],
+          "apiFamilies": [
+            "health",
+            "admin",
+            "live"
+          ],
+          "uiSurface": "not-packaged",
+          "productGap": "Need clean one-city setup, env template, create-city, backup/restore, smoke tests, and wiki."
+        }
+      ],
+      "entityCounts": {
+        "building": 230641,
+        "facility": 240,
+        "green_blue_system": 180,
+        "place": 35,
+        "road": 900
+      },
+      "sourceLayerCounts": {
+        "buildings": 900,
+        "center": 1,
+        "facilities": 240,
+        "greenBlue": 180,
+        "overture-buildings": 290821,
+        "places": 34,
+        "roads": 900
+      },
+      "workflows": [
+        {
+          "workflowKey": "open-data-city-bootstrap",
+          "name": "Open Data City Bootstrap",
+          "domain": "open-data-ingestion",
+          "lifecycleStatus": "reference",
+          "defaultMode": "agent-assisted",
+          "standardsMapping": {
+            "catalog": "DCAT",
+            "context": [
+              "NGSI-LD",
+              "FIWARE"
+            ],
+            "geospatial": [
+              "OGC API Features",
+              "PostGIS"
+            ],
+            "provenance": "PROV-O"
+          }
+        },
+        {
+          "workflowKey": "private-provider-validation",
+          "name": "Private And Provider Data Validation",
+          "domain": "provider-validation",
+          "lifecycleStatus": "planned",
+          "defaultMode": "human-approved",
+          "standardsMapping": {
+            "policy": "ODRL",
+            "catalog": "DCAT",
+            "geospatial": [
+              "OGC API Features",
+              "CityJSON",
+              "IFC"
+            ],
+            "provenance": "PROV-O"
+          }
+        },
+        {
+          "workflowKey": "standards-publication-refresh",
+          "name": "Standards Publication Refresh",
+          "domain": "standards-publication",
+          "lifecycleStatus": "reference",
+          "defaultMode": "agent-assisted",
+          "standardsMapping": {
+            "catalog": "DCAT",
+            "context": [
+              "NGSI-LD",
+              "FIWARE"
+            ],
+            "semantic": [
+              "JSON-LD",
+              "semantic-pack-manifest"
+            ],
+            "geospatial": [
+              "OGC API Features"
+            ]
+          }
+        }
+      ],
+      "workflowRuns": [
+        {
+          "id": "5e64f0ba-cc99-4b84-9b93-af0628e722d7",
+          "workflowId": "e5df216f-55db-41a2-9e86-0cfcc6166c8b",
+          "workflowKey": "standards-publication-refresh",
+          "workflowName": "Standards Publication Refresh",
+          "cityId": "kharkiv",
+          "requestedBy": "ldt-ops-smoke",
+          "requestedByKind": "system-smoke",
+          "triggerKind": "smoke-test",
+          "status": "queued",
+          "input": {
+            "smoke": true,
+            "cityId": "kharkiv",
+            "workflowKey": "standards-publication-refresh",
+            "refreshInterop": true,
+            "refreshViewerAggregates": true
+          },
+          "output": {},
+          "error": {},
+          "startedAt": null,
+          "finishedAt": null,
+          "createdAt": "2026-05-19T20:42:41.341Z",
+          "updatedAt": "2026-05-19T20:42:41.360Z"
+        },
+        {
+          "id": "9ea5c99e-6ff3-4908-ae9d-cf0b4290db09",
+          "workflowId": "e5df216f-55db-41a2-9e86-0cfcc6166c8b",
+          "workflowKey": "standards-publication-refresh",
+          "workflowName": "Standards Publication Refresh",
+          "cityId": "kharkiv",
+          "requestedBy": "ldt-ops-smoke",
+          "requestedByKind": "system-smoke",
+          "triggerKind": "smoke-test",
+          "status": "queued",
+          "input": {
+            "smoke": true,
+            "cityId": "kharkiv",
+            "workflowKey": "standards-publication-refresh",
+            "refreshInterop": true,
+            "refreshViewerAggregates": true
+          },
+          "output": {},
+          "error": {},
+          "startedAt": null,
+          "finishedAt": null,
+          "createdAt": "2026-05-19T20:22:24.834Z",
+          "updatedAt": "2026-05-19T20:22:24.856Z"
+        },
+        {
+          "id": "66e506bd-a0a6-42b8-a07f-1c396df4cec4",
+          "workflowId": "e5df216f-55db-41a2-9e86-0cfcc6166c8b",
+          "workflowKey": "standards-publication-refresh",
+          "workflowName": "Standards Publication Refresh",
+          "cityId": "kharkiv",
+          "requestedBy": "ldt-ops-smoke",
+          "requestedByKind": "system-smoke",
+          "triggerKind": "smoke-test",
+          "status": "queued",
+          "input": {
+            "smoke": true,
+            "cityId": "kharkiv",
+            "workflowKey": "standards-publication-refresh",
+            "refreshInterop": true,
+            "refreshViewerAggregates": true
+          },
+          "output": {},
+          "error": {},
+          "startedAt": null,
+          "finishedAt": null,
+          "createdAt": "2026-05-19T18:52:55.503Z",
+          "updatedAt": "2026-05-19T18:52:55.523Z"
+        },
+        {
+          "id": "ae9ac1b2-6df9-47e2-baf0-468c745e14d9",
+          "workflowId": "e5df216f-55db-41a2-9e86-0cfcc6166c8b",
+          "workflowKey": "standards-publication-refresh",
+          "workflowName": "Standards Publication Refresh",
+          "cityId": "kharkiv",
+          "requestedBy": "ldt-ops-smoke",
+          "requestedByKind": "system-smoke",
+          "triggerKind": "smoke-test",
+          "status": "queued",
+          "input": {
+            "smoke": true,
+            "cityId": "kharkiv",
+            "workflowKey": "standards-publication-refresh",
+            "refreshInterop": true,
+            "refreshViewerAggregates": true
+          },
+          "output": {},
+          "error": {},
+          "startedAt": null,
+          "finishedAt": null,
+          "createdAt": "2026-05-19T14:04:10.239Z",
+          "updatedAt": "2026-05-19T14:04:10.257Z"
+        },
+        {
+          "id": "17891126-8e6b-433d-9ae0-df3f44bda65f",
+          "workflowId": "e5df216f-55db-41a2-9e86-0cfcc6166c8b",
+          "workflowKey": "standards-publication-refresh",
+          "workflowName": "Standards Publication Refresh",
+          "cityId": "kharkiv",
+          "requestedBy": "ldt-ops-smoke",
+          "requestedByKind": "system-smoke",
+          "triggerKind": "smoke-test",
+          "status": "queued",
+          "input": {
+            "smoke": true,
+            "cityId": "kharkiv",
+            "workflowKey": "standards-publication-refresh",
+            "refreshInterop": true,
+            "refreshViewerAggregates": true
+          },
+          "output": {},
+          "error": {},
+          "startedAt": null,
+          "finishedAt": null,
+          "createdAt": "2026-05-19T13:13:28.389Z",
+          "updatedAt": "2026-05-19T13:13:28.409Z"
+        },
+        {
+          "id": "73cd1ce6-c130-471e-945b-516b6b4a3f9a",
+          "workflowId": "e5df216f-55db-41a2-9e86-0cfcc6166c8b",
+          "workflowKey": "standards-publication-refresh",
+          "workflowName": "Standards Publication Refresh",
+          "cityId": "kharkiv",
+          "requestedBy": "ldt-ops-smoke",
+          "requestedByKind": "system-smoke",
+          "triggerKind": "smoke-test",
+          "status": "queued",
+          "input": {
+            "smoke": true,
+            "cityId": "kharkiv",
+            "workflowKey": "standards-publication-refresh",
+            "refreshInterop": true,
+            "refreshViewerAggregates": true
+          },
+          "output": {},
+          "error": {},
+          "startedAt": null,
+          "finishedAt": null,
+          "createdAt": "2026-05-19T05:39:04.203Z",
+          "updatedAt": "2026-05-19T05:39:04.223Z"
+        },
+        {
+          "id": "dbf5fa9f-4d03-4f24-ad9f-0dea2e5ecdca",
+          "workflowId": "e5df216f-55db-41a2-9e86-0cfcc6166c8b",
+          "workflowKey": "standards-publication-refresh",
+          "workflowName": "Standards Publication Refresh",
+          "cityId": "kharkiv",
+          "requestedBy": "ldt-ops-smoke",
+          "requestedByKind": "system-smoke",
+          "triggerKind": "smoke-test",
+          "status": "queued",
+          "input": {
+            "smoke": true,
+            "cityId": "kharkiv",
+            "workflowKey": "standards-publication-refresh",
+            "refreshInterop": true,
+            "refreshViewerAggregates": true
+          },
+          "output": {},
+          "error": {},
+          "startedAt": null,
+          "finishedAt": null,
+          "createdAt": "2026-05-19T04:48:08.861Z",
+          "updatedAt": "2026-05-19T04:48:08.881Z"
+        },
+        {
+          "id": "238448e6-7316-4ed5-a973-23187b5e60d0",
+          "workflowId": "e5df216f-55db-41a2-9e86-0cfcc6166c8b",
+          "workflowKey": "standards-publication-refresh",
+          "workflowName": "Standards Publication Refresh",
+          "cityId": "kharkiv",
+          "requestedBy": "ldt-ops-smoke",
+          "requestedByKind": "system-smoke",
+          "triggerKind": "smoke-test",
+          "status": "queued",
+          "input": {
+            "smoke": true,
+            "cityId": "kharkiv",
+            "workflowKey": "standards-publication-refresh",
+            "refreshInterop": true,
+            "refreshViewerAggregates": true
+          },
+          "output": {},
+          "error": {},
+          "startedAt": null,
+          "finishedAt": null,
+          "createdAt": "2026-05-19T04:27:29.876Z",
+          "updatedAt": "2026-05-19T04:27:29.895Z"
+        },
+        {
+          "id": "5cb64850-2f9d-4394-93c3-334fd7fd4e84",
+          "workflowId": "e5df216f-55db-41a2-9e86-0cfcc6166c8b",
+          "workflowKey": "standards-publication-refresh",
+          "workflowName": "Standards Publication Refresh",
+          "cityId": "kharkiv",
+          "requestedBy": "ldt-ops-smoke",
+          "requestedByKind": "system-smoke",
+          "triggerKind": "smoke-test",
+          "status": "queued",
+          "input": {
+            "smoke": true,
+            "cityId": "kharkiv",
+            "workflowKey": "standards-publication-refresh",
+            "refreshInterop": true,
+            "refreshViewerAggregates": true
+          },
+          "output": {},
+          "error": {},
+          "startedAt": null,
+          "finishedAt": null,
+          "createdAt": "2026-05-19T03:47:59.012Z",
+          "updatedAt": "2026-05-19T03:47:59.032Z"
+        },
+        {
+          "id": "846fb456-8981-439f-8fa5-907bb28c038b",
+          "workflowId": "e5df216f-55db-41a2-9e86-0cfcc6166c8b",
+          "workflowKey": "standards-publication-refresh",
+          "workflowName": "Standards Publication Refresh",
+          "cityId": "kharkiv",
+          "requestedBy": "ldt-ops-smoke",
+          "requestedByKind": "system-smoke",
+          "triggerKind": "smoke-test",
+          "status": "queued",
+          "input": {
+            "smoke": true,
+            "cityId": "kharkiv",
+            "workflowKey": "standards-publication-refresh",
+            "refreshInterop": true,
+            "refreshViewerAggregates": true
+          },
+          "output": {},
+          "error": {},
+          "startedAt": null,
+          "finishedAt": null,
+          "createdAt": "2026-05-19T03:10:01.640Z",
+          "updatedAt": "2026-05-19T03:10:01.664Z"
+        }
+      ],
+      "error": null
+    }
+  },
+  "phaseOrder": [
+    {
+      "phase": 10,
+      "title": "Product Capability Contract",
+      "status": "accepted-with-known-partials"
+    },
+    {
+      "phase": 11,
+      "title": "LDT-Native UI Rebuild",
+      "status": "mostly-implemented"
+    },
+    {
+      "phase": 12,
+      "title": "API Governance And Observability",
+      "status": "closed-for-implementation"
+    },
+    {
+      "phase": 13,
+      "title": "Visual Surfaces Rebuild",
+      "status": "in-progress"
+    },
+    {
+      "phase": 14,
+      "title": "Open-Data Workflow Runner",
+      "status": "pending"
+    },
+    {
+      "phase": 15,
+      "title": "One-City Open-Source Production Package",
+      "status": "pending"
+    },
+    {
+      "phase": 16,
+      "title": "Agentic Operations Layer",
+      "status": "blocked-until-workflow-gates"
+    }
+  ]
+}

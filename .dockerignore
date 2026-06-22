@@ -1,0 +1,12 @@
+.next
+node_modules
+npm-debug.log
+.git
+.DS_Store
+.env
+runtime-data/auth
+runtime-data/live-cache
+runtime-data/bim-assets
+runtime-data/validation
+runtime-data/*.sqlite
+runtime-data/*.sqlite-*

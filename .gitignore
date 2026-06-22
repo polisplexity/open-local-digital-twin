@@ -1,0 +1,52 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+
+# runtime state
+/runtime-data/live-cache/
+/runtime-data/auth/users.json
+/runtime-data/auth/sessions.json
+/runtime-data/auth/tokens.json
+/runtime-data/auth/outbox/
+/runtime-data/bim-assets/
+/runtime-data/3d-tiles/
+/runtime-data/validation/
+/runtime-data/twin-state.sqlite
+/runtime-data/twin-state.sqlite-*
+
+# drone / deploy artifacts
+/dist/
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts

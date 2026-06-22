@@ -1,0 +1,88 @@
+.fc .fc-toolbar.fc-header-toolbar {
+  height: 80px;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  -webkit-justify-content: center;
+  -ms-flex-pack: center;
+  justify-content: space-between;
+  -webkit-justify-content: space-between;
+  -ms-flex-pack: space-between;
+  margin-bottom: 0;
+  padding: 0 15px;
+  background: #fff;
+
+
+}
+
+.fc .fc-button:focus {
+  outline: 0;
+  box-shadow: none;
+}
+
+.fc .fc-button-primary {
+  color: #6f6f6f;
+  color: var(--fc-button-text-color, #6f6f6f);
+  background-color: transparent;
+  border: 2px solid;
+  border-color: #6f6f6f;
+  border-color: var(--fc-button-border-color, #eaeaea);
+}
+
+.fc .fc-button-primary:hover {
+  color: #6f6f6f;
+  color: var(--fc-button-text-color, #6f6f6f);
+  border: 2px solid;
+  background-color: #eaeaea;
+  background-color: var(--fc-button-hover-bg-color, #eaeaea);
+  border-color: #eaeaea;
+  border-color: var(--fc-button-hover-border-color, #eaeaea);
+}
+
+.fc .fc-button-primary:focus {
+  box-shadow: none;
+}
+
+.fc .fc-button-primary:not(:disabled):active,
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+  color: #6f6f6f;
+  color: var(--fc-button-text-color, #6f6f6f);
+  background-color: #eaeaea;
+  background-color: var(--fc-button-active-bg-color, #eaeaea);
+  border-color: #eaeaea;
+  border-color: var(--fc-button-active-border-color, #eaeaea);
+}
+
+.fc .fc-button-primary:not(:disabled):active:focus,
+.fc .fc-button-primary:not(:disabled).fc-button-active:focus {
+  box-shadow: none;
+}
+
+
+.fc a {
+  color: #6f7a7f;
+}
+
+
+
+/* @media (max-width : 767px){
+
+		.calendarapp-wrap .calendar-wrap .fc-header-toolbar .fc-today-button,
+		.fc-right {
+			display: none;
+		}
+
+		.calendarapp-wrap .calendar-wrap .fc-header-toolbar .fc-left {
+			position: absolute;
+			top: 0;
+			bottom: 0;
+		}
+
+		.calendarapp-wrap .calendar-wrap .fc-header-toolbar .fc-center {
+			margin-left: auto;
+			margin-right: auto;
+		}
+  } */
