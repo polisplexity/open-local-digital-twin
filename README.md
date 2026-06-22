@@ -87,6 +87,12 @@ privacy posture metadata.
 
 See [PRIVACY.md](./PRIVACY.md) and [DO_NO_HARM.md](./DO_NO_HARM.md).
 
+## Community And Security
+
+- [Security Policy](./SECURITY.md)
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+
 ## Install
 
 ```bash
@@ -195,6 +201,8 @@ POST /api/provider/v1/fiware/observations
 - [Semantic Pack Standard](./docs/SEMANTIC_PACK_STANDARD.md)
 - [Society and Culture Standard](./docs/SOCIETY_CULTURE_STANDARD.md)
 - [Urban Science Standard](./docs/URBAN_SCIENCE_STANDARD.md)
+- [Public Demo City Baseline](./docs/PUBLIC_DEMO_CITY_BASELINE.md)
+- [DPG Submission Evidence](./docs/DPG_SUBMISSION_EVIDENCE.md)
 
 ## Security And Secrets
 

@@ -54,6 +54,8 @@ Core documentation:
 - [docs/PROVIDER_CONNECTOR_CONTRACT.md](./docs/PROVIDER_CONNECTOR_CONTRACT.md)
 - [docs/SEMANTIC_PACK_STANDARD.md](./docs/SEMANTIC_PACK_STANDARD.md)
 - [docs/SOCIETY_CULTURE_STANDARD.md](./docs/SOCIETY_CULTURE_STANDARD.md)
+- [docs/PUBLIC_DEMO_CITY_BASELINE.md](./docs/PUBLIC_DEMO_CITY_BASELINE.md)
+- [docs/DPG_SUBMISSION_EVIDENCE.md](./docs/DPG_SUBMISSION_EVIDENCE.md)
 
 ## 6. Data Extraction
 
@@ -97,9 +99,17 @@ official truth without review.
 
 See [DO_NO_HARM.md](./DO_NO_HARM.md).
 
-## Current Gaps Before Formal DPG Submission
+## Community, Security, And Review
 
-- Public repository URL is live at
-  https://github.com/polisplexity/open-local-digital-twin.
-- Add an examples page with at least one non-sensitive city baseline.
-- Add a public issue template for security/privacy reports.
+- Public repository URL:
+  https://github.com/polisplexity/open-local-digital-twin
+- Public release:
+  https://github.com/polisplexity/open-local-digital-twin/releases/tag/v0.1.0
+- Security policy:
+  [SECURITY.md](./SECURITY.md)
+- Contribution guide:
+  [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Code of conduct:
+  [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- Public issue templates:
+  [.github/ISSUE_TEMPLATE](./.github/ISSUE_TEMPLATE)
