@@ -99,7 +99,7 @@ See [DO_NO_HARM.md](./DO_NO_HARM.md).
 
 ## Current Gaps Before Formal DPG Submission
 
-- Confirm public GitHub repository URL after publication.
+- Public repository URL is live at
+  https://github.com/polisplexity/open-local-digital-twin.
 - Add an examples page with at least one non-sensitive city baseline.
-- Add a public changelog or release tag.
 - Add a public issue template for security/privacy reports.
