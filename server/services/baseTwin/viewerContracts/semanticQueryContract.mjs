@@ -1,4 +1,8 @@
 import { buildViewerSurfaceManifest, normalizeViewerSurface, VIEWER_SURFACE_KEYS } from './viewerSurfaceManifest.mjs'
+import {
+  semanticClassCompatibilityForKey,
+  semanticVocabularyContract,
+} from '../../semanticLayer/semanticVocabularyAdapter.mjs'
 
 export const SEMANTIC_QUERY_CONTRACT_VERSION = '2026-05-21'
 
@@ -44,10 +48,11 @@ const COMMON_FIELDS = [
   },
 ]
 
+
 const SEMANTIC_CLASSES = [
   {
-    key: 'boundary',
-    label: 'Municipal boundary',
+    key: 'territorialGovernance',
+    label: 'Territorial governance',
     inventoryTier: 'base',
     familyKey: 'boundary',
     layerKeys: ['boundary'],
@@ -58,8 +63,8 @@ const SEMANTIC_CLASSES = [
     fields: COMMON_FIELDS,
   },
   {
-    key: 'landUseCoverageGap',
-    label: 'Land-use coverage gap',
+    key: 'landUse',
+    label: 'Land use',
     inventoryTier: 'base-gap',
     familyKey: 'landUseCoverageGap',
     layerKeys: ['unclassifiedLand'],
@@ -87,8 +92,8 @@ const SEMANTIC_CLASSES = [
     ],
   },
   {
-    key: 'roads',
-    label: 'Roads',
+    key: 'mobilityNetwork',
+    label: 'Mobility network',
     inventoryTier: 'base',
     familyKey: 'roads',
     layerKeys: ['roads'],
@@ -115,8 +120,8 @@ const SEMANTIC_CLASSES = [
     ],
   },
   {
-    key: 'buildings',
-    label: 'Buildings',
+    key: 'builtFabric',
+    label: 'Built fabric',
     inventoryTier: 'base',
     familyKey: 'buildings',
     layerKeys: ['buildings'],
@@ -200,8 +205,8 @@ const SEMANTIC_CLASSES = [
     ],
   },
   {
-    key: 'accessSeeds',
-    label: 'Access seeds',
+    key: 'civicServices',
+    label: 'Civic services',
     inventoryTier: 'inferred-seed',
     familyKey: 'accessSeeds',
     layerKeys: ['civic', 'mobility', 'commerce', 'wasteSeeds', 'facilities'],
@@ -228,8 +233,8 @@ const SEMANTIC_CLASSES = [
     ],
   },
   {
-    key: 'semanticPacks',
-    label: 'Semantic packs',
+    key: 'semanticPackOutputs',
+    label: 'Semantic pack outputs',
     inventoryTier: 'semantic-pack',
     familyKey: 'semanticPacks',
     layerKeys: ['semanticPacks'],
@@ -256,8 +261,8 @@ const SEMANTIC_CLASSES = [
     ],
   },
   {
-    key: 'providerOverlays',
-    label: 'Provider overlays',
+    key: 'providerEvidence',
+    label: 'Provider evidence',
     inventoryTier: 'provider-evidence',
     familyKey: 'providerOverlays',
     layerKeys: ['providerOverlays'],
@@ -291,7 +296,7 @@ const QUERY_EXAMPLES = [
     key: 'tall-buildings',
     label: 'Buildings taller than 10 m',
     query: {
-      classes: ['buildings'],
+      classes: ['builtFabric'],
       scope: { key: 'radius' },
       filters: [{ field: 'heightMeters', operator: 'gte', value: 10 }],
       render: { mode: 'isolate' },
@@ -301,7 +306,7 @@ const QUERY_EXAMPLES = [
     key: 'primary-roads',
     label: 'Primary road network',
     query: {
-      classes: ['roads'],
+      classes: ['mobilityNetwork'],
       scope: { key: 'city' },
       filters: [{ field: 'roadClass', operator: 'in', value: ['primary', 'secondary', 'trunk'] }],
       render: { mode: 'show' },
@@ -311,7 +316,7 @@ const QUERY_EXAMPLES = [
     key: 'all-semantics-in-area',
     label: 'All semantic objects in an area',
     query: {
-      classes: ['buildings', 'roads', 'greenBlue', 'places', 'accessSeeds', 'semanticPacks'],
+      classes: ['builtFabric', 'mobilityNetwork', 'greenBlue', 'places', 'civicServices', 'semanticPackOutputs'],
       scope: { key: 'customPolygon' },
       filters: [],
       render: { mode: 'show' },
@@ -343,7 +348,47 @@ function classManifestIsAllowed(semanticClass, manifest) {
     semanticClass.layerKeys.some((layerKey) => allowedLayerKeys.has(layerKey))
 }
 
-function enrichClass(semanticClass, capabilitiesByLayer) {
+function normalizeRegistrySnapshot(semanticRegistry = null) {
+  if (!semanticRegistry?.available || !Array.isArray(semanticRegistry.classes)) {
+    return {
+      available: false,
+      source: semanticRegistry?.source || 'fallback-hardcoded-contract',
+      classesByKey: new Map(),
+      tagsByClass: {},
+      sourceMappingsByClass: {},
+      summary: semanticRegistry?.summary || {},
+      error: semanticRegistry?.error || null,
+    }
+  }
+  return {
+    available: true,
+    source: semanticRegistry.source || 'ldt_semantic',
+    classesByKey: new Map(semanticRegistry.classes.map((entry) => [entry.key, entry])),
+    tagsByClass: semanticRegistry.tagsByClass || {},
+    sourceMappingsByClass: semanticRegistry.sourceMappingsByClass || {},
+    summary: semanticRegistry.summary || {},
+    error: semanticRegistry.error || null,
+  }
+}
+
+function canonicalClassKeyFor(semanticClass, registry) {
+  return registry.classesByKey.has(semanticClass.key) ? semanticClass.key : null
+}
+
+function publicSourceMappings(mappings = []) {
+  return mappings.slice(0, 8).map((mapping) => ({
+    providerKey: mapping.providerKey,
+    sourceFamily: mapping.sourceFamily,
+    sourceLayer: mapping.sourceLayer,
+    entityType: mapping.entityType,
+    confidence: mapping.confidence,
+    authorityStatus: mapping.authorityStatus,
+    lifecycleStatus: mapping.lifecycleStatus,
+  }))
+}
+
+function enrichClass(semanticClass, capabilitiesByLayer, registry) {
+  const compatibility = semanticClassCompatibilityForKey(semanticClass.key)
   const capabilityLayers = semanticClass.layerKeys
     .map((layerKey) => capabilitiesByLayer.get(layerKey))
     .filter(Boolean)
@@ -359,14 +404,44 @@ function enrichClass(semanticClass, capabilitiesByLayer) {
       .map((layer) => layer.sourceLicense)
       .filter(Boolean),
   ))
+  const canonicalClassKey = canonicalClassKeyFor(semanticClass, registry)
+  const registryClass = canonicalClassKey ? registry.classesByKey.get(canonicalClassKey) : null
+  const registryTags = canonicalClassKey ? registry.tagsByClass[canonicalClassKey] || [] : []
+  const registryMappings = canonicalClassKey ? registry.sourceMappingsByClass[canonicalClassKey] || [] : []
 
   return {
     ...semanticClass,
+    canonicalClassKey: canonicalClassKey || semanticClass.key,
+    compatibility: compatibility ? {
+      runtimeClassKey: compatibility.runtimeClassKey,
+      familyKey: compatibility.familyKey,
+      aliases: compatibility.aliases,
+      layerKeys: compatibility.layerKeys,
+      entityTypes: compatibility.entityTypes,
+      priority: compatibility.priority,
+    } : null,
     featureCount,
     availableLayerKeys: capabilityLayers.map((layer) => layer.key),
     sourceLicenses,
     recommendedTransports: transports,
     availability: featureCount > 0 ? 'available' : 'declared',
+    registryStatus: registryClass ? 'registry-linked' : 'canonical-contract-only',
+    registry: registryClass ? {
+      label: registryClass.label,
+      description: registryClass.description,
+      inventoryTier: registryClass.inventoryTier,
+      authorityRequirement: registryClass.authorityRequirement,
+      lifecycleStatus: registryClass.lifecycleStatus,
+      allowedEntityTypes: registryClass.allowedEntityTypes,
+      standardsMapping: registryClass.standardsMapping,
+    } : null,
+    semanticTags: registryTags.map((tag) => ({
+      key: tag.key,
+      label: tag.label,
+      valueType: tag.valueType,
+      authorityRequirement: tag.authorityRequirement,
+    })),
+    sourceMappings: publicSourceMappings(registryMappings),
   }
 }
 
@@ -384,14 +459,16 @@ export function buildSemanticQueryContract({
   surface = VIEWER_SURFACE_KEYS.map,
   mode = 'cockpit',
   layerCapabilities = [],
+  semanticRegistry = null,
 } = {}) {
   const surfaceKey = normalizeViewerSurface(surface)
   const manifest = buildViewerSurfaceManifest({ cityId, surface: surfaceKey, mode })
   const capabilitiesByLayer = layerCapabilityMap(layerCapabilities)
+  const registry = normalizeRegistrySnapshot(semanticRegistry)
   const classes = SEMANTIC_CLASSES
     .filter((semanticClass) => classSurfaceIsAllowed(semanticClass, surfaceKey))
     .filter((semanticClass) => classManifestIsAllowed(semanticClass, manifest))
-    .map((semanticClass) => enrichClass(semanticClass, capabilitiesByLayer))
+    .map((semanticClass) => enrichClass(semanticClass, capabilitiesByLayer, registry))
 
   return {
     ok: true,
@@ -400,11 +477,19 @@ export function buildSemanticQueryContract({
     surface: surfaceKey,
     mode: manifest.mode,
     meaningModel: {
-      semanticClass: 'Typed city-object meaning such as building, road, green-blue system, place, access seed, or semantic-pack output.',
+      semanticClass: 'Typed city-object meaning such as built fabric, mobility network, green-blue system, place, civic service, or semantic-pack output.',
       field: 'Queryable attribute on a semantic class, such as heightMeters, roadClass, sourceCoverageStatus, or confidence.',
       scope: 'Spatial selection such as city, viewport, radius, district/neighborhood, block/manzana, or custom polygon.',
       semanticPack: 'Domain logic attached to the base inventory after source, authority, and workflow rules are accepted.',
     },
+    semanticRegistry: {
+      available: registry.available,
+      source: registry.source,
+      summary: registry.summary,
+      error: registry.error,
+      canonicalClassKeys: Array.from(registry.classesByKey.keys()),
+    },
+    semanticVocabulary: semanticVocabularyContract(),
     classes,
     operators: QUERY_OPERATORS,
     scopes: supportedScopes(manifest),
@@ -422,11 +507,11 @@ export function buildSemanticQueryContract({
       manifest: `/api/live/${encodeURIComponent(cityId)}/viewer-manifest?surface=${encodeURIComponent(surfaceKey)}`,
     },
     queryShape: {
-      classes: ['buildings'],
+      classes: ['builtFabric'],
       scope: { key: 'radius', center: ['lon', 'lat'], radiusMeters: 1000 },
       filters: [{ field: 'heightMeters', operator: 'gte', value: 10 }],
       combine: 'and',
-      render: { mode: 'isolate', maxFeatures: 5000 },
+      render: { mode: 'isolate', maxFeatures: 50000 },
     },
     examples: QUERY_EXAMPLES.filter((example) =>
       example.query.classes.some((classKey) => classes.some((semanticClass) => semanticClass.key === classKey)),

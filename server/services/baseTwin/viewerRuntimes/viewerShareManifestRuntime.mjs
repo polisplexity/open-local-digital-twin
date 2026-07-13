@@ -1,8 +1,8 @@
 export function renderViewerShareManifestRuntime() {
   return `
         const viewerQueryFeatureBudgets = {
-          map: 300000,
-          '3d': 300000,
+          map: 50000,
+          '3d': 0,
           immersive: 300000,
         }
 
@@ -40,7 +40,7 @@ export function renderViewerShareManifestRuntime() {
           const queryManifest = queryManifestFromViewerShare(share)
           if (!queryManifest?.query) throw new Error('VIEWER_SHARE_QUERY_MISSING')
           const transport = viewerId === '3d'
-            ? 'cesium-primitives'
+            ? 'selection-reference'
             : viewerId === 'immersive'
               ? 'scene-manifest'
               : 'mvt'
@@ -77,12 +77,14 @@ export function renderViewerShareManifestRuntime() {
           if (!queryResponse.ok || !queryResult?.ok) {
             throw new Error(queryResult?.error || queryResult?.detail || 'VIEWER_SHARE_QUERY_FAILED')
           }
+          const responseTransport = String(queryResult.transport || queryPayload.render?.transport || '').trim()
+          const { geojson, ...transportedQueryResult } = queryResult
           return {
-            ...queryResult,
+            ...transportedQueryResult,
             share,
             shareKey,
             queryManifest,
-            ...(queryResult.geojson ? { geojson: queryResult.geojson } : {}),
+            ...(responseTransport === 'geojson' && geojson ? { geojson } : {}),
           }
         }
   `

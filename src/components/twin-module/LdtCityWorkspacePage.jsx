@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Alert, Badge, Button, Col, Row, Spinner } from 'react-bootstrap'
 import { RefreshCw } from 'react-feather'
-import DigitalTwinSurfaceShell from '@/app/(apps layout)/apps/digital-twin/DigitalTwinSurfaceShell'
+import DigitalTwinSurfaceShell from '@/components/twin-module/shell/DigitalTwinSurfaceShell'
 import { usePlatformContext } from '@/context/PlatformContext'
 import WorkspaceModuleNav from './workspace/WorkspaceModuleNav'
 import WorkspaceModulePanel from './workspace/WorkspaceModulePanel'
@@ -159,7 +159,8 @@ const LdtCityWorkspacePage = () => {
   const requestedModule = searchParams.get('module') || 'overview'
   const activeTab = cityModuleTabs.some((tab) => tab.key === requestedModule) ? requestedModule : 'overview'
   const activeModule = cityModuleTabs.find((tab) => tab.key === activeTab) ?? cityModuleTabs[0]
-  const workspaceTitle = activeTab === 'overview' ? `${activeCity?.name || 'Kharkiv'} LDT Workspace` : activeModule.label
+  const activeCityName = activeCity?.name || 'Current city'
+  const workspaceTitle = activeTab === 'overview' ? `${activeCityName} LDT Workspace` : activeModule.label
   const readinessSummary = payload?.readinessSummary ?? {}
   const readinessGaps = payload?.readinessGaps ?? []
   const indicators = useMemo(() => buildPrimaryIndicators(payload), [payload])
@@ -221,7 +222,7 @@ const LdtCityWorkspacePage = () => {
     <DigitalTwinSurfaceShell
       badge={state.loading ? 'Loading' : 'Live'}
       showSurfaceSidebar={false}
-      title="Kharkiv LDT Workspace"
+      title={workspaceTitle}
     >
       <div className="ldt-workspace">
         <section className="ldt-cockpit-head" id="ldt-overview">
@@ -262,7 +263,7 @@ const LdtCityWorkspacePage = () => {
                 <section className="ldt-workspace-hero">
                   <div>
                     <span className="ldt-workspace-hero__eyebrow">Single-city product path</span>
-                    <h1>{activeCity?.name || 'Kharkiv'} city twin control room</h1>
+                    <h1>{activeCityName} city twin control room</h1>
                     <p>
                       Standards-native workspace for inventory, evidence,
                       interoperability, analysis, semantic packs, workflows, and API operations.

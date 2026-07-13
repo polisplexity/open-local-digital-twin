@@ -8,6 +8,7 @@ import { usePlatformContext } from '@/context/PlatformContext'
 
 const DESKTOP_MIN_WIDTH = 1180
 const BYPASS_KEY = 'twin-desktop-first-bypass'
+const BYPASS_CLASS = 'twin-desktop-first-bypass'
 
 const DesktopFirstGate = ({ surfaceName = 'workspace', description }) => {
   const { activeCity } = usePlatformContext()
@@ -26,6 +27,11 @@ const DesktopFirstGate = ({ surfaceName = 'workspace', description }) => {
     window.addEventListener('resize', syncViewport)
     return () => window.removeEventListener('resize', syncViewport)
   }, [])
+
+  useEffect(() => {
+    document.body.classList.toggle(BYPASS_CLASS, isCompact && bypass)
+    return () => document.body.classList.remove(BYPASS_CLASS)
+  }, [bypass, isCompact])
 
   const handleContinue = () => {
     window.sessionStorage.setItem(BYPASS_KEY, '1')

@@ -24,6 +24,10 @@ attributes. A semantic pack is later domain logic attached to that inventory,
 for example reconstruction service readiness or waste/street-cleanliness
 workflows.
 
+For the broader platform model, including physical entities, semantic
+attributes/tags, utility infrastructure, and installable semantic packs, see
+[SEMANTIC_LAYER_ARCHITECTURE.md](./SEMANTIC_LAYER_ARCHITECTURE.md).
+
 ## Query Shape
 
 Every visualizer should receive the same query object:
@@ -98,11 +102,12 @@ The executable query endpoints return normalized query metadata, result counts,
 counts by semantic class/layer, bounds, and the transport payload requested by
 the active viewer. Product visualizers must request a non-GeoJSON transport:
 
-- `/map` requests `render.transport = "mvt"` and receives a query-aware vector
+- `/analytical-map` requests `render.transport = "mvt"` and receives a query-aware vector
   tile template.
-- `/municipal` requests `render.transport = "cesium-primitives"` and receives a
-  bounded primitive payload for Cesium.
-- `/public` requests `render.transport = "scene-manifest"` and receives compact
+- `/city-3d` requests `render.transport = "selection-reference"` and receives
+  counts, bounds, a stable query reference, and active 3D Tiles artifact links
+  without a direct geometry payload.
+- `/civic-xr` requests `render.transport = "scene-manifest"` and receives compact
   scene/story metadata.
 - API/export/debug tools may explicitly request `render.transport = "geojson"`.
 
@@ -123,7 +128,10 @@ render budget.
 
 `semantic-query` is the simple SDTQuery-style helper. `twin-query` is the
 powerful path: TwinQL/CQL2 JSON compiled to safe, parameterized PostGIS SQL over
-`ldt_query.city_objects`. Raw SQL is intentionally not accepted by the UI/API.
+`ldt_query.city_objects`. The UI also exposes an expert SQL tab, but it accepts
+only a read-only PostGIS `WHERE` expression over `ldt_query.city_objects` as
+alias `co`; full SQL statements, joins, comments, DDL, DML, and system catalogs
+are rejected.
 `twin-query` now also accepts `clauses[]` with `operation: "union"` so a single
 viewer request can combine different classes, radii, and filters.
 
@@ -164,6 +172,8 @@ Available now:
 - explicit query-radius controls in the visual rail,
 - structured `and/or` predicate composition in the visual rail,
 - executable multi-clause union manifests in the TwinQL visual rail,
+- expert PostGIS `WHERE` mode over `ldt_query.city_objects co` for technical
+  users who need predicates that the builder does not expose yet,
 - semantic-query event logging in `ldt_viewer.semantic_query_events`,
 - recent query run history and replay in the visual rail, backed by
   `ldt_viewer.semantic_query_events`,

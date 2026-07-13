@@ -1,6 +1,7 @@
 # City 3D Tiles Pipeline
 
-Status: Phase 13 professional Cesium route, first implementation.
+Status: professional Cesium artifact route, registry-backed first
+implementation.
 
 ## Purpose
 
@@ -33,21 +34,34 @@ footprints:
   - `buildings.glb`: glTF 2.0 binary with simple extruded building footprints.
   - `features.json`: sidecar index from rendered geometry to `object_id`.
   - `manifest.json`: provenance, counts, limits, and next-step notes.
-- Registry table: `ldt_viewer.city_3d_tilesets`.
+- 3D-specific registry table: `ldt_viewer.city_3d_tilesets`.
+- Common viewer artifact lifecycle table: `ldt_viewer.viewer_artifacts`.
+- Registry-first delivery service:
+  `server/services/viewerArtifacts/viewerArtifactDelivery.mjs`.
+- Registry paths are resolved against the current `runtime-data` root when a
+  record was generated in another runtime, such as `/app/runtime-data` inside a
+  Docker container and the WSL repo `runtime-data` on the host.
 - Discovery route: `GET /api/live/:cityId/3d-tilesets`.
+- Common artifact route: `GET /api/live/:cityId/viewer-artifacts`.
 - Asset route:
   `GET /api/live/:cityId/3d-tiles/:tilesetKey/:version/:assetName`.
+- City 3D viewer consumption: `/city-3d` requests the registered tileset
+  catalog, loads the active `tileset.json` through Cesium
+  `Cesium3DTileset.fromUrl`, and displays the loaded 3D Tiles package status
+  before falling back to query-scoped primitives for analyst selections.
 
 Command:
 
 ```bash
-npm run db:ldt:build-city-3d-tiles -- --city=kharkiv --tileset-key=base-buildings --limit=1000
+npm run db:ldt:build-city-3d-tiles -- --city=guanajuato --tileset-key=base-buildings --limit=1000
 ```
 
 Smoke:
 
 ```bash
-npm run test:city-3d-tiles-smoke
+npm run test:city-3d-tiles-smoke -- --city=guanajuato
+npm run test:city-3d-tiles-viewer-consumption-smoke -- --city=guanajuato
+npm run test:viewer-artifact-registry-smoke -- --city=guanajuato
 ```
 
 ## Why 3D Tiles
@@ -67,29 +81,69 @@ This is different from the current query preview path:
 
 ## Current Limitations
 
-The first builder is intentionally conservative:
+The first builder and current generated packages are intentionally conservative:
 
 - It generates a single tile, not a full spatial LOD tree.
 - It extrudes buildings from footprints and available height/levels.
 - If height is missing, it uses a default extrusion.
 - It stores picking identity in `features.json`; batch metadata is planned.
-- It does not yet replace the live City 3D runtime. The runtime still consumes
-  query-scoped primitives for Phase 13 while this data engineering route is
-  hardened.
+- It does not yet provide native per-object styling/filtering from embedded tile
+  metadata. Query-scoped primitives remain useful only for explicit small
+  previews and overlays.
+
+## Prepared Selection Reference Transport
+
+TwinQuery uses a 3D reference transport for City 3D query work:
+
+```json
+{
+  "render": {
+    "mode": "highlight",
+    "transport": "selection-reference"
+  }
+}
+```
+
+This is the City 3D default path. TwinQuery returns counts, bounds, query hash,
+materialization links, and active 3D artifact references without returning
+render geometry to the browser.
+
+The intended use is:
+
+1. City 3D loads the base city from registered 3D Tiles.
+2. TwinQuery returns a `selectionReference` for the query result.
+3. A later materialization step persists the reference as an analysis selection
+   or query-scoped viewer artifact.
+4. The viewer highlights or filters against the active 3D artifact instead of
+   receiving a direct feature payload.
+
+This is deliberately separate from `cesium-primitives`. Primitives remain a
+bounded preview path for small selections; `selection-reference` is the
+no-geometry control-plane path for larger 3D selections.
+
+Product rule: do not expose `selection-reference` as a user-facing button or
+mode label. It is an internal transport decision behind normal query actions.
+If the UI needs a visible distinction later, it should be framed in product
+terms such as city-scale filtering, saved analysis, or tile-backed highlight,
+not as the transport name.
 
 ## Next Professional Steps
 
-1. Split buildings into spatial tiles with geometric error and LOD rules.
+1. Add stronger LOD rules for large-city package generation.
 2. Add feature metadata so Cesium picking can return stable inventory IDs
    directly from the tileset.
 3. Generate query-scoped tilesets for saved views, not only full city packages.
 4. Add object storage mode for production deployments.
-5. Add City 3D runtime toggle/load path for registered tilesets.
-6. Add terrain/raster/phenomena tiles where the source data requires streaming.
+5. Add terrain/raster/phenomena tiles where the source data requires streaming.
 
 ## Operating Principle
 
 3D Tiles are a derived visual artifact. The city inventory remains in PostGIS.
-The tileset registry must always preserve the query, source view, version, and
-semantic class that generated the package.
+The tileset registry and common viewer artifact registry must always preserve
+the query, source view, version, semantic class, byte size, checksum, status, and
+active version that generated or promoted the package.
 
+Live routes must resolve registered artifacts before serving runtime files. This
+keeps PMTiles, MVT, and 3D Tiles under the same publication rule and makes
+future object-storage delivery a transport swap instead of a product-contract
+change.

@@ -1,7 +1,7 @@
 import { closeSharedProductionPool, withProductionClient as withClient } from './serviceDatabase.mjs'
 import { refreshLdtObjectObservationSummary } from './ldtObservationSummaryService.mjs'
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = []
 const DEFAULT_GRID_KEY = 'city-density-2km'
 const DEFAULT_SCENARIO_KEY = 'baseline'
 const DEFAULT_CELL_LIMIT = 2000

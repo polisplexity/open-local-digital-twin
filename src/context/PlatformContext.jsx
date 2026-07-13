@@ -7,12 +7,12 @@ const CITY_SELECTION_STORAGE_KEY = 'twinSelectedCityId'
 const defaultContext = {
   workspaceName: 'Twin Base Studio',
   brandName: 'Polisplexity',
-  registryActiveCityId: 'adazi',
+  registryActiveCityId: '',
   registryActiveCity: null,
   selectedCityId: '',
   selectedCity: null,
   availableCities: [],
-  activeCityId: 'adazi',
+  activeCityId: '',
   activeCity: null,
   cities: [],
   authenticated: false,
@@ -55,13 +55,16 @@ function resolveContext(serverContext = defaultContext, selectedCityId = '') {
   const selectedCity =
     availableCities.find((city) => city.id === selectedCityId) ??
     null
-  const fallbackCity =
+  const serverActiveCity =
     availableCities.find((city) => city.id === serverContext.registryActiveCityId) ??
-    availableCities[0] ??
     registryActiveCity ??
+    null
+  const fallbackCity =
+    serverActiveCity ??
+    availableCities[0] ??
     cities[0] ??
     null
-  const activeCity = selectedCity ?? fallbackCity
+  const activeCity = serverContext.authenticated ? fallbackCity : selectedCity ?? fallbackCity
 
   return {
     ...serverContext,
@@ -125,7 +128,7 @@ export function PlatformContextProvider({ children, initialContext }) {
             return serverContext.allowedCityIds.includes(city.id)
           })
         : []
-      const validCityId = nextAvailableCities.find((city) => city.id === normalized)?.id ?? normalized
+      const validCityId = nextAvailableCities.find((city) => city.id === normalized)?.id ?? ''
 
       setSelectedCityIdState(validCityId)
 
@@ -150,6 +153,29 @@ export function PlatformContextProvider({ children, initialContext }) {
     () => resolveContext(serverContext, selectedCityId),
     [selectedCityId, serverContext],
   )
+
+  useEffect(() => {
+    if (!selectedCityId) return
+    const isAvailable = resolvedContext.availableCities.some((city) => city.id === selectedCityId)
+    const conflictsWithAuthenticatedCity =
+      serverContext.authenticated &&
+      Boolean(serverContext.registryActiveCityId) &&
+      selectedCityId !== serverContext.registryActiveCityId
+
+    if (!isAvailable || conflictsWithAuthenticatedCity) {
+      setSelectedCityIdState('')
+      try {
+        window.localStorage.removeItem(CITY_SELECTION_STORAGE_KEY)
+      } catch {
+        // Ignore storage access failures and keep the backend city authoritative.
+      }
+    }
+  }, [
+    resolvedContext.availableCities,
+    selectedCityId,
+    serverContext.authenticated,
+    serverContext.registryActiveCityId,
+  ])
 
   const value = useMemo(
     () => ({

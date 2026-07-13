@@ -165,7 +165,12 @@ async function readJson(response, label) {
 }
 
 async function runQuery(context, baseUrl, cityId, surface, center) {
-  const transport = surface === 'immersive' ? 'scene-manifest' : ''
+  const transportBySurface = {
+    map: 'mvt',
+    municipal3d: 'selection-reference',
+    immersive: 'scene-manifest',
+  }
+  const transport = transportBySurface[surface] || 'metadata'
   const response = await context.request.post(`${baseUrl}/api/live/${encodeURIComponent(cityId)}/twin-query`, {
     data: {
       language: 'twinql-json',
@@ -177,7 +182,7 @@ async function runQuery(context, baseUrl, cityId, surface, center) {
       },
       render: {
         mode: 'isolate',
-        ...(transport ? { transport } : {}),
+        transport,
         maxFeatures: 250,
       },
       surface,
@@ -186,14 +191,26 @@ async function runQuery(context, baseUrl, cityId, surface, center) {
     },
   })
   const payload = await readJson(response, `QUERY_${surface}`)
-  if (surface === 'immersive') {
+  if (surface === 'map') {
+    assert(payload.transport === 'mvt', `QUERY_MVT_TRANSPORT_MISSING:${surface}`)
+    assert(!payload.geojson, `QUERY_MVT_LEAKS_GEOJSON:${surface}`)
+    assert(payload.links?.vectorTileTemplate, `QUERY_MVT_TILE_TEMPLATE_MISSING:${surface}`)
+    assert(Number(payload.summary?.resultCount ?? 0) > 0, `QUERY_RESULT_COUNT_EMPTY:${surface}`)
+    assert(Number(payload.summary?.returned ?? 0) === 0, `QUERY_MVT_SHOULD_NOT_RETURN_FEATURES:${surface}`)
+  } else if (surface === 'municipal3d') {
+    assert(payload.transport === 'selection-reference', `QUERY_SELECTION_REFERENCE_TRANSPORT_MISSING:${surface}`)
+    assert(!payload.geojson, `QUERY_SELECTION_REFERENCE_LEAKS_GEOJSON:${surface}`)
+    assert(!payload.primitives, `QUERY_SELECTION_REFERENCE_LEAKS_PRIMITIVES:${surface}`)
+    assert(payload.selectionReference?.kind === 'twin-query-selection-reference', `QUERY_SELECTION_REFERENCE_MISSING:${surface}`)
+    assert(payload.links?.threeDTilesets, `QUERY_SELECTION_REFERENCE_3D_TILESETS_LINK_MISSING:${surface}`)
+    assert(Number(payload.summary?.resultCount ?? 0) > 0, `QUERY_RESULT_COUNT_EMPTY:${surface}`)
+    assert(Number(payload.summary?.returned ?? -1) === 0, `QUERY_SELECTION_REFERENCE_SHOULD_NOT_RETURN_FEATURES:${surface}`)
+  } else if (surface === 'immersive') {
     assert(payload.transport === 'scene-manifest', `QUERY_SCENE_MANIFEST_TRANSPORT_MISSING:${surface}`)
     assert(!payload.geojson, `QUERY_SCENE_MANIFEST_LEAKS_GEOJSON:${surface}`)
     assert(payload.sceneManifest?.objects?.length > 0, `QUERY_SCENE_MANIFEST_OBJECTS_EMPTY:${surface}`)
-  } else {
-    assert(payload.geojson?.type === 'FeatureCollection', `QUERY_GEOJSON_MISSING:${surface}`)
+    assert(Number(payload.summary?.returned ?? 0) > 0, `QUERY_RETURNED_EMPTY:${surface}`)
   }
-  assert(Number(payload.summary?.returned ?? 0) > 0, `QUERY_RETURNED_EMPTY:${surface}`)
   return payload
 }
 
@@ -313,7 +330,7 @@ async function newAuthenticatedContext(browser, { baseUrl, viewport, email, pass
 const baseUrl = (argValue('base-url') || process.env.TWIN_STUDIO_SMOKE_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '')
 const email = argValue('email') || process.env.TWIN_STUDIO_SMOKE_EMAIL
 const password = argValue('password') || process.env.TWIN_STUDIO_SMOKE_PASSWORD
-const cityId = argValue('city') || process.env.TWIN_STUDIO_E2E_CITY_ID || 'kharkiv'
+const cityId = argValue('city') || process.env.TWIN_STUDIO_E2E_CITY_ID || 'guanajuato'
 const outputDir = argValue('output-dir') || process.env.TWIN_STUDIO_VISUAL_SMOKE_OUTPUT_DIR || '/tmp/twin-visual-browser-smoke'
 const headed = boolArg('headed')
 const viewports = parseViewports(argValue('viewports'))

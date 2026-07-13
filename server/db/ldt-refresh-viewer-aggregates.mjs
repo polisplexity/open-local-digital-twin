@@ -3,7 +3,7 @@ import {
   refreshLdtViewerAggregates,
 } from '../services/ldtViewerAggregateService.mjs'
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = []
 
 function argValue(name) {
   const prefix = `--${name}=`

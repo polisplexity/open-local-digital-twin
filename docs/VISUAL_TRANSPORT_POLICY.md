@@ -14,7 +14,7 @@ match the viewer:
 | Surface | Runtime transport | Purpose |
 | --- | --- | --- |
 | Analytical map | Predicate-aware MVT from PostGIS | Large 2D city-object rendering, filtering, and embed maps. |
-| City 3D | Cesium primitives for active queries, registered 3D Tiles packages for generated assets | Query-scoped 3D inspection now, streamable city-scale 3D packages next. |
+| City 3D | `selection-reference` over registered 3D Tiles packages | City-scale 3D queries without sending geometry payloads to the browser. |
 | Civic XR | Babylon/WebXR scene manifest now, richer scene graph later | Browser XR views derived from the same query contract. |
 | API/export/debug | GeoJSON by explicit request only | Interoperability, inspection, tests, and small bounded downloads. |
 
@@ -29,10 +29,11 @@ FeatureCollection as their primary visual payload.
 
 - `mvt`: returns metadata, result counts, bounds, and a query-aware vector-tile
   template. The map renders from `/twin-query-tiles/{z}/{x}/{y}.mvt`.
-- `cesium-primitives`: returns query-scoped primitives for the municipal 3D
-  viewer. This is the bridge until the 3D Tiles package is promoted.
-- `3d-tiles`: returns or references registered 3D Tiles packages. This is the
-  target transport for generated city-scale 3D geometry.
+- `selection-reference`: returns counts, bounds, query hash, materialization
+  links, and references to registered 3D Tiles packages without returning render
+  geometry. This is the City 3D default.
+- `cesium-primitives`: returns query-scoped primitives for explicit small 3D
+  previews and compatibility tests only.
 - `scene-manifest`: returns a compact scene/story manifest for the immersive
   surface.
 - `metadata`: returns counts and bounds only.
@@ -41,6 +42,45 @@ FeatureCollection as their primary visual payload.
 If no transport is requested, the API can still return GeoJSON for legacy
 tests, diagnostics, or external clients. Product visualizers must request their
 transport explicitly.
+
+## GeoJSON Limit-And-Inform Pattern
+
+GeoJSON remains useful for inspection, export, interoperability, tests, and
+small external clients. It is not allowed to pretend to be a full-city viewer
+transport.
+
+Any GeoJSON response is treated as a preview/export compatibility payload:
+
+- default preview cap: `TWIN_STUDIO_TWIN_QUERY_GEOJSON_DEFAULT_LIMIT` (5,000
+  features by default);
+- hard preview cap: `TWIN_STUDIO_TWIN_QUERY_GEOJSON_MAX_LIMIT` (20,000
+  features by default);
+- every capped response includes `summary.transportPolicy` with requested
+  limit, effective limit, returned count, total count, warning text, and
+  recommended native transports;
+- UI controls that expose a GeoJSON response must show a visible warning instead
+  of letting the user assume the full dataset rendered.
+
+This follows the platform rule for slow compatibility formats: limit and inform.
+Full city visual surfaces must use MVT/PMTiles, registered 3D Tiles through
+selection references, or scene manifests, depending on the viewer.
+
+## Enforcement Pattern
+
+This is a product boundary, not a style preference. Product viewers must pass
+through a transport adapter before any payload reaches the iframe runtime:
+
+- map viewers request and receive `mvt` plus a vector-tile template;
+- City 3D viewers request and receive `selection-reference` plus registered
+  3D Tiles artifact links;
+- Civic XR viewers request and receive `scene-manifest`;
+- shared/saved view replay must preserve the viewer-native transport and drop
+  accidental GeoJSON payloads unless the query explicitly requested
+  `render.transport = "geojson"`.
+
+The browser smoke and visual-contract smoke are expected to fail if map, City
+3D, or Civic XR query replay starts depending on a GeoJSON FeatureCollection
+again.
 
 ## Civic XR Scene Manifest
 
@@ -71,11 +111,15 @@ larger GeoJSON payloads and not direct reuse of 2D MVT.
 
 Current Phase 13 rule:
 
-- use MVT for `/map`;
-- use query-scoped Cesium primitives for `/city-3d` base inspection and small
+- use MVT for `/analytical-map`;
+- use `selection-reference` over registered 3D Tiles for `/city-3d` query
+  responses;
+- keep query-scoped Cesium primitives only for explicit small previews and
   scientific overlays;
 - generate and register first 3D Tiles packages through
   `npm run db:ldt:build-city-3d-tiles`;
+- load registered 3D Tiles in `/city-3d` as the main city-scale building
+  package when a ready viewer artifact exists;
 - keep bounded FeatureCollection environmental-cell responses as transitional
   API transport only;
 - move heavy buildings, terrain, BIM/CityJSON, simulation volumes, and public

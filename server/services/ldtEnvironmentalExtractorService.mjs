@@ -1,6 +1,6 @@
 import { closeSharedProductionPool, withProductionClient as withClient } from './serviceDatabase.mjs'
 
-const DEFAULT_CITY_IDS = ['kharkiv']
+const DEFAULT_CITY_IDS = []
 const DEFAULT_SCENARIO_KEY = 'baseline'
 const DEFAULT_RUN_VERSION = 'contract-v0'
 const DEFAULT_RUN_LIMIT = 50

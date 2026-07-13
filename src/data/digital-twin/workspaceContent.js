@@ -61,7 +61,7 @@ export function getTwinUserProfile(city, currentUser = null) {
   const regionLabel = getWorkspaceSubline(city)
   const name = currentUser?.fullName || 'Workspace User'
   const shortName = currentUser?.fullName || 'Workspace User'
-  const email = currentUser?.email || 'workspace.user@polisplexity.tech'
+  const email = currentUser?.email || 'workspace.user@example.org'
   const role = currentUser?.roles?.includes('platform-admin')
     ? 'Platform administrator'
     : currentUser?.role || 'Municipal reviewer'

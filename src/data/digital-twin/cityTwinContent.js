@@ -221,25 +221,25 @@ export function getViewerSurfaceRegisterData() {
       id: 'map',
       Surface: 'Analytical map',
       'Base twin shown': 'Boundary, roads, buildings, green-blue systems, and places',
-      'Logical twin shown': 'Layer bundles, inventory counts, selected-object metadata, fidelity controls, and map state',
-      'Semantic seeds shown': 'Civic, mobility, commerce, and waste seeds when the corresponding bundle is enabled',
-      'Transport posture': 'Local payload only. No shared catalog or semantic exchange model yet.',
+      'Logical twin shown': 'TwinQL/CQL2 results, contextual queries, saved selections, indicators, and selected-object metadata',
+      'Semantic seeds shown': 'Governed entity properties and indicator observations returned by the active query',
+      'Transport posture': 'MapLibre consumes the shared query contract; OGC Features, GeoJSON, and MVT outputs are available to registered consumers.',
     },
     {
-      id: 'municipal',
-      Surface: 'Municipal / 3D',
+      id: 'city3d',
+      Surface: 'City 3D',
       'Base twin shown': 'Simplified boundary, roads, buildings, green-blue context, and place references',
-      'Logical twin shown': 'LOD scene payloads, camera presets, bundle switching, and scene inventory',
-      'Semantic seeds shown': 'Civic, mobility, commerce, and waste seeds inside the spatial operations reading',
-      'Transport posture': 'Local scene payload only. Not yet brokered or standardized for exchange.',
+      'Logical twin shown': 'The same query selection, generated 3D Tiles packages, provider assets, and simulation-world styling',
+      'Semantic seeds shown': 'Query properties, governed indicators, model outputs, and world-specific values',
+      'Transport posture': 'Cesium consumes the shared query/passport contract and registered 3D Tiles artifacts.',
     },
     {
-      id: 'public',
+      id: 'civicXr',
       Surface: 'Civic XR',
       'Base twin shown': 'Recognisable streets, buildings, public realm, and orientation elements',
-      'Logical twin shown': 'XR scene state, visible-layer bundles, and fidelity management',
-      'Semantic seeds shown': 'Only the simpler explanatory seeds needed for civic storytelling',
-      'Transport posture': 'Local XR scene payload only. No external exchange layer yet.',
+      'Logical twin shown': 'A lightweight Babylon.js/WebXR interpretation of the active query and share manifest',
+      'Semantic seeds shown': 'The explanatory properties and evidence selected for stakeholder communication',
+      'Transport posture': 'Consumes the shared query/passport contract; public no-session signed embeds remain future work.',
     },
   ]
 }
@@ -277,7 +277,7 @@ export function getWs2PilotDetailRegisterData() {
       id: 'rq2-lifecycle',
       Requirement: 'Rq2 data lifecycle',
       'Manual expectation': 'Describe tools, standards, components, and the data lifecycle from collection to use and sharing.',
-      'Current platform posture': 'Theory and Docs separate collection, normalization, semantic interpretation, transport, and reuse.',
+      'Current platform posture': 'The manual separates collection, normalization, canonical storage, semantic interpretation, controlled exchange, evidence readback, and promotion.',
     },
     {
       id: 'rq13-seven-layers',
@@ -289,13 +289,13 @@ export function getWs2PilotDetailRegisterData() {
       id: 'rq17-semantic-interoperability',
       Requirement: 'Rq17 semantic interoperability',
       'Manual expectation': 'Ensure semantic interoperability of exchanged data through open standards such as NGSI-LD or LDES.',
-      'Current platform posture': 'Semantic seeds are explicit, but transport remains local. The interoperability register keeps NGSI-LD, JSON-LD, RDF, LDES, and DCAT as future obligations, not fake current features.',
+      'Current platform posture': 'NGSI-LD/JSON-LD, OGC Features, GeoJSON, and DCAT-style exchange contracts exist and have laboratory acceptance evidence. RDF graph export, LDES, and authority-operated federation remain future work.',
     },
     {
       id: 'rc7-catalog-broker',
       Requirement: 'Rc7 catalog and broker posture',
       'Manual expectation': 'Prefer DCAT cataloging and a context broker capable of JSON-LD, RDF, or NGSI-LD.',
-      'Current platform posture': 'Documented as pending architecture. The product makes this visible instead of mixing it into the base twin.',
+      'Current platform posture': 'OLDT publishes standards projections and has tested a configurable EU LDT Data Platform/NGSI-LD broker boundary. A production authority-operated broker federation is not claimed.',
     },
   ]
 }
@@ -328,9 +328,9 @@ export function getTwinModelRegisterData(city) {
     {
       id: 'transport',
       Layer: 'Interoperability / transport',
-      'Current status': 'Planned',
-      'What it contains': 'Current internal JSON payload only',
-      'What it does not contain yet': 'NGSI-LD, JSON-LD, DCAT, context broker, LDES, or federation path',
+      'Current status': 'Implemented / laboratory accepted',
+      'What it contains': 'NGSI-LD/JSON-LD projections, OGC API Features, GeoJSON, OpenAPI, DCAT-style manifests, configurable integration profiles, and controlled workflow receipts',
+      'What it does not contain yet': 'Authority-operated federation, RDF graph export, LDES streams, or production approval for every semantic pack',
     },
   ]
 }
@@ -358,14 +358,14 @@ export function getDataTransportLifecycleData() {
     {
       id: 'exchange',
       Stage: 'Transport and exchange',
-      'Current posture': 'Internal payload only',
-      'Next expectation': 'NGSI-LD / JSON-LD / RDF / DCAT and brokered exchange',
+      'Current posture': 'NGSI-LD/JSON-LD, OGC Features, GeoJSON, DCAT-style packages, configurable profiles, and accepted laboratory exchanges',
+      'Next expectation': 'Production authority endpoints, RDF graph export, LDES, and deployment-specific governance',
     },
     {
       id: 'reuse',
       Stage: 'Reuse and federation',
-      'Current posture': 'Not active yet',
-      'Next expectation': 'Cross-city reuse, pilot federation, and service interoperability',
+      'Current posture': 'Portable profiles, Marketplace/Data Space packages, and saved question contracts are implemented in the laboratory',
+      'Next expectation': 'Cross-city authority adoption, production federation, and approved operational reuse',
     },
   ]
 }
@@ -396,7 +396,7 @@ export function getPublicSourcesData(city) {
       source: 'Twin Base payload',
       category: 'Logical twin output',
       scope: 'Inventory, bundles, counts, viewer state, and scene-ready structures.',
-      status: 'Feeds the current product surface, not yet the interoperability layer.',
+      status: 'Feeds native viewers and standards projections; external exchange requires an explicit profile and workflow.',
     },
   ]
 }
@@ -468,37 +468,37 @@ export function getInteroperabilityRegisterData() {
     {
       id: 'model',
       Topic: 'Shared model',
-      'Current status': 'Not formalized',
-      'What exists now': 'Internal JSON payload and viewer structures',
-      'Next step': 'Define the shared data model for the pilot',
+      'Current status': 'Implemented with bounded contracts',
+      'What exists now': 'Canonical PostGIS entities and subjects, stable IDs, governed observations, JSON-LD contexts, and viewer/query manifests',
+      'Next step': 'Approve deployment-specific semantic mappings and authority ownership',
     },
     {
       id: 'catalog',
       Topic: 'Catalog and discoverability',
-      'Current status': 'Not formalized',
-      'What exists now': 'Human-readable docs and source register',
-      'Next step': 'Add DCAT-ready metadata and publication posture',
+      'Current status': 'Generated / laboratory exercised',
+      'What exists now': 'Source catalog records, DCAT-style manifests, Standards surface, Marketplace packages, and provenance receipts',
+      'Next step': 'Publish through an authority-operated catalog with approved licenses and metadata',
     },
     {
       id: 'exchange',
       Topic: 'Exchange format',
-      'Current status': 'Not formalized',
-      'What exists now': 'Internal JSON only',
-      'Next step': 'Prepare NGSI-LD / JSON-LD / RDF transport path',
+      'Current status': 'Implemented / laboratory accepted',
+      'What exists now': 'NGSI-LD/JSON-LD, OGC API Features, GeoJSON, OpenAPI, MVT, checksummed packages, and EDC transfer evidence',
+      'Next step': 'Add RDF graph export and LDES when a real consumer contract requires them',
     },
     {
       id: 'broker',
       Topic: 'Context and broker layer',
-      'Current status': 'Not active',
-      'What exists now': 'No context broker in the current prototype',
-      'Next step': 'Evaluate a brokered layer when the pilot semantics are agreed',
+      'Current status': 'Optional external profile',
+      'What exists now': 'Configurable EU LDT Data Platform profiles with NGSI-LD publish/readback acceptance',
+      'Next step': 'Configure the municipality or national broker and validate its auth, tenancy, subscriptions, and retention policy',
     },
     {
       id: 'federation',
       Topic: 'Federation path',
-      'Current status': 'Not active',
-      'What exists now': 'Single-city local twin instance',
-      'Next step': 'Define reuse and exchange between pilot members',
+      'Current status': 'Portable but not production-federated',
+      'What exists now': 'Multiple target profiles, OIDC providers, Marketplace agents, EDC provider/consumer profiles, and portable saved questions',
+      'Next step': 'Run an authority-approved multi-city or national federation and retain its operational evidence',
     },
   ]
 }

@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import { closeSharedProductionPool, withProductionClient as withClient } from './serviceDatabase.mjs'
 import { refreshLdtObjectObservationSummary } from './ldtObservationSummaryService.mjs'
 
-const DEFAULT_CITY_IDS = ['kharkiv']
+const DEFAULT_CITY_IDS = []
 const DEFAULT_SCENARIO_KEY = 'baseline'
 const DEFAULT_RAINFALL_MM = 30
 const DEFAULT_DURATION_HOURS = 1

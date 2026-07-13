@@ -9,7 +9,7 @@ import {
 } from '../services/ldtOpsService.mjs'
 
 const cityArg = process.argv.find((arg) => arg.startsWith('--city='))
-const cityId = cityArg ? cityArg.split('=').slice(1).join('=').trim() : 'kharkiv'
+const cityId = cityArg ? cityArg.split('=').slice(1).join('=').trim() : 'guanajuato'
 const workflowKey = 'phase14-open-data-workflow-runner'
 
 const workflows = await listAgenticWorkflowDefinitions()
@@ -31,11 +31,11 @@ const created = await createWorkflowRun({
     sourcePlan: {
       kind: 'osm-local-extract',
       posture: 'open-data-native',
-      target: 'kharkiv-repeatable-bootstrap',
+      target: `${cityId}-repeatable-bootstrap`,
     },
     providerPackages: [
       {
-        layerKey: 'e2e-smoke-geojson',
+        layerKey: 'roads',
         action: 'geojson',
         sourceFormat: 'geojson',
         sourceUri: 'memory://phase14-workflow-runner-smoke.geojson',

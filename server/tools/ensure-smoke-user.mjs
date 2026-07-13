@@ -6,7 +6,7 @@ const { Client } = pg
 
 const DEFAULT_EMAIL = 'smoke@polisplexity.test'
 const DEFAULT_PASSWORD = 'local-smoke-password-change-me'
-const DEFAULT_CITY_ID = 'kharkiv'
+const DEFAULT_CITY_ID = process.env.TWIN_STUDIO_E2E_CITY_ID || process.env.TWIN_STUDIO_CITY_ID || 'guanajuato'
 const PASSWORD_KEYLEN = 64
 
 function argValue(name) {

@@ -2,6 +2,7 @@ import { PRODUCT_CAPABILITIES } from '../../tools/product-capability-contract.mj
 import { normalizeWorkflowRun } from './workflowService.mjs'
 import { buildReadinessAssessment } from './readinessAssessment.mjs'
 import { countRows, moduleAvailable, withClient } from './dbUtils.mjs'
+import { activeWorkflowStorageKeys } from './workflowContractsService.mjs'
 
 export async function getCityCapabilityState(cityId) {
   return withClient(async (client) => {
@@ -22,7 +23,21 @@ export async function getCityCapabilityState(cityId) {
       }
     }
 
-    const datasets = await countRows(client, 'SELECT count(*) FROM ldt_catalog.datasets WHERE city_id = $1', [cityId])
+    const catalogDatasets = await countRows(client, 'SELECT count(*) FROM ldt_catalog.datasets WHERE city_id = $1', [cityId])
+    const modelOutputDatasets = await countRows(
+      client,
+      `
+        SELECT count(*)
+        FROM (
+          SELECT model_key, model_version
+          FROM ldt_enrichment.entity_model_output_summary
+          WHERE city_id = $1
+          GROUP BY model_key, model_version
+        ) model_datasets
+      `,
+      [cityId],
+    )
+    const datasets = catalogDatasets + modelOutputDatasets
     const sourceFeatures = await countRows(client, 'SELECT count(*) FROM ldt_prov.source_features WHERE city_id = $1', [cityId])
     const entities = await countRows(client, 'SELECT count(*) FROM ldt_core.city_entities WHERE city_id = $1', [cityId])
     const ngsiProjections = await countRows(
@@ -56,7 +71,10 @@ export async function getCityCapabilityState(cityId) {
     const providerLayers = await countRows(client, 'SELECT count(*) FROM public.layer_definitions WHERE city_id = $1', [cityId])
     const ingestionJobs = await countRows(client, 'SELECT count(*) FROM public.layer_ingestion_jobs WHERE city_id = $1', [cityId])
     const apiEvents = await countRows(client, 'SELECT count(*) FROM ldt_ops.api_usage_events WHERE city_id = $1', [cityId])
-    const workflowDefinitions = await countRows(client, 'SELECT count(*) FROM ldt_ops.workflow_definitions')
+    const activeWorkflowKeys = activeWorkflowStorageKeys()
+    const workflowDefinitions = activeWorkflowKeys.length
+      ? await countRows(client, 'SELECT count(*) FROM ldt_ops.workflow_definitions WHERE workflow_key = ANY($1::text[])', [activeWorkflowKeys])
+      : 0
     const workflowRuns = await countRows(client, 'SELECT count(*) FROM ldt_ops.workflow_runs WHERE city_id = $1', [cityId])
     const pendingWorkflowApprovals = await countRows(
       client,
@@ -93,8 +111,9 @@ export async function getCityCapabilityState(cityId) {
     const workflowResult = await client.query(`
       SELECT workflow_key, name, domain, lifecycle_status, default_mode, standards_mapping
       FROM ldt_ops.workflow_definitions
+      WHERE workflow_key = ANY($1::text[])
       ORDER BY domain, workflow_key
-    `)
+    `, [activeWorkflowKeys])
     const recentWorkflowRuns = await client.query(
       `
         SELECT run.*, definition.name AS workflow_name
@@ -109,6 +128,8 @@ export async function getCityCapabilityState(cityId) {
 
     const counts = {
       datasets,
+      catalogDatasets,
+      modelOutputDatasets,
       sourceFeatures,
       entities,
       ngsiProjections,

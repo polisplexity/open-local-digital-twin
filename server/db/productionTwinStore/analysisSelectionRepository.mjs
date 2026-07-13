@@ -173,6 +173,7 @@ function rowToSelectionMember(row = {}) {
     entityType: row.entity_type,
     label: row.label,
     geometryType: row.geometry_type,
+    geometrySnapshot: row.geometry_snapshot_geojson ? parseMaybeJson(row.geometry_snapshot_geojson, null) : null,
     clauseId: row.clause_id,
     clauseLabel: row.clause_label,
     rank: Number(row.rank ?? 0),
@@ -200,6 +201,7 @@ function memberPayload(rows = []) {
     entity_type: row.entityType,
     label: row.label,
     geometry_type: row.geometryType,
+    geometry_snapshot: row.geometrySnapshot ?? null,
     clause_id: row.clauseId,
     clause_label: row.clauseLabel,
     rank: index + 1,
@@ -225,6 +227,7 @@ async function insertSelectionMembers(client, selectionSetId, rows = []) {
           entity_type,
           label,
           geometry_type,
+          geometry_snapshot,
           clause_id,
           clause_label,
           rank,
@@ -235,13 +238,24 @@ async function insertSelectionMembers(client, selectionSetId, rows = []) {
         )
         SELECT
           $1::uuid,
-          NULLIF(member.city_entity_id, '')::uuid,
+          CASE
+            WHEN member.city_entity_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN (
+              SELECT entity.id
+              FROM ldt_core.city_entities entity
+              WHERE entity.id = member.city_entity_id::uuid
+            )
+            ELSE NULL
+          END,
           member.object_id,
           member.semantic_class,
           member.layer_key,
           member.entity_type,
           COALESCE(member.label, member.object_id),
           member.geometry_type,
+          CASE
+            WHEN member.geometry_snapshot IS NULL THEN NULL
+            ELSE ST_SetSRID(ST_GeomFromGeoJSON(member.geometry_snapshot::text), 4326)
+          END,
           member.clause_id,
           member.clause_label,
           member.rank,
@@ -260,6 +274,7 @@ async function insertSelectionMembers(client, selectionSetId, rows = []) {
           entity_type text,
           label text,
           geometry_type text,
+          geometry_snapshot jsonb,
           clause_id text,
           clause_label text,
           rank integer,
@@ -276,6 +291,7 @@ async function insertSelectionMembers(client, selectionSetId, rows = []) {
           entity_type = EXCLUDED.entity_type,
           label = EXCLUDED.label,
           geometry_type = EXCLUDED.geometry_type,
+          geometry_snapshot = EXCLUDED.geometry_snapshot,
           clause_id = EXCLUDED.clause_id,
           clause_label = EXCLUDED.clause_label,
           rank = EXCLUDED.rank,
@@ -620,6 +636,7 @@ export async function listAnalysisSelectionMembers(cityId, selectionId, options 
       `
         SELECT
           member.*,
+          ST_AsGeoJSON(member.geometry_snapshot)::jsonb AS geometry_snapshot_geojson,
           ST_AsGeoJSON(member.sample_point)::jsonb AS sample_point_geojson
         FROM ldt_analysis.selection_set_members member
         JOIN ldt_analysis.selection_sets selection

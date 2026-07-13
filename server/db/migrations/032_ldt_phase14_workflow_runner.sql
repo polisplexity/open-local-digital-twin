@@ -13,8 +13,8 @@ INSERT INTO ldt_ops.workflow_definitions (
 VALUES
   (
     'phase14-open-data-workflow-runner',
-    'Open Data Import Runner',
-    'Run approved open-data, provider-exchange, and environmental extractor workflows as auditable city operations instead of manual scripts.',
+    'Open Source City Builder',
+    'Build or refresh the base city twin from OSM, Overture, open data, provider packages, environmental extractors, and viewer/query refreshes as auditable city operations.',
     'open-data-workflows',
     'current',
     'human-approved-worker',

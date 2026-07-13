@@ -1,6 +1,6 @@
 import { closeSharedProductionPool, withProductionClient as withClient } from './serviceDatabase.mjs'
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = []
 const STANDARD_KEY = 'urban-science-core'
 const STANDARD_VERSION = '0.1.0'
 

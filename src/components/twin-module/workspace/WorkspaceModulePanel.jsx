@@ -1,6 +1,5 @@
 import AnalysisWorkspacePanel from './panels/AnalysisWorkspacePanel'
 import InventoryWorkspacePanel from './panels/InventoryWorkspacePanel'
-import OperationsWorkspacePanel from './panels/OperationsWorkspacePanel'
 import SemanticPacksWorkspacePanel from './panels/SemanticPacksWorkspacePanel'
 import SourcesWorkspacePanel from './panels/SourcesWorkspacePanel'
 import StandardsWorkspacePanel from './panels/StandardsWorkspacePanel'
@@ -97,33 +96,6 @@ export default function WorkspaceModulePanel({
         semanticRows={semanticRows}
         semanticRuleRows={semanticRuleRows}
         semanticWorkflowRows={semanticWorkflowRows}
-      />
-    )
-  }
-
-  if (activeTab === 'operations') {
-    return (
-      <OperationsWorkspacePanel
-        activeCityId={activeCityId}
-        apiCatalogRows={apiCatalogRows}
-        apiUsageRows={apiUsageRows}
-        checksByCategory={checksByCategory}
-        counts={counts}
-        ingestionRows={ingestionRows}
-        layerCapabilities={layerCapabilities}
-        metricsError={state.metricsError}
-        metricsFamilyRows={metricsFamilyRows}
-        metricsSummary={state.metricsSummary}
-        openApiDocument={state.openApiDocument}
-        openApiError={state.openApiError}
-        openApiRows={openApiRows}
-        operationsError={state.operationsError}
-        operationsReport={state.operationsReport}
-        operationsView={operationsView}
-        refreshWorkspace={refreshWorkspace}
-        setOperationsView={setOperationsView}
-        slowRouteRows={slowRouteRows}
-        workflowRuns={workflowRuns}
       />
     )
   }

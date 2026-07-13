@@ -1,5 +1,6 @@
 import { getCityConfig } from '../../cityRegistry.mjs'
 import { liveBaseEndpoint, renderMetricTiles, renderSharedShell } from '../viewerShellRenderer.mjs'
+import { buildViewerBaseMapCatalog, renderBaseMapSwitcher } from '../viewerContracts/baseMapCatalog.mjs'
 import { renderCity3dPhenomenaButtons } from '../viewerContracts/city3dPhenomenaContract.mjs'
 import { buildViewerSurfaceManifest } from '../viewerContracts/viewerSurfaceManifest.mjs'
 import { renderCityCesiumRuntime } from '../viewerRuntimes/cityCesiumRuntime.mjs'
@@ -7,6 +8,7 @@ import { renderCityCesiumRuntime } from '../viewerRuntimes/cityCesiumRuntime.mjs
 export function renderCity3dPage({ cityId = 'current', embed = false } = {}) {
   const city = getCityConfig(cityId)
   const baseEndpoint = liveBaseEndpoint(cityId)
+  const baseMapCatalog = buildViewerBaseMapCatalog()
   const surfaceManifest = buildViewerSurfaceManifest({
     cityId,
     surface: 'municipal3d',
@@ -156,6 +158,11 @@ export function renderCity3dPage({ cityId = 'current', embed = false } = {}) {
             </div>
             <div class="phenomena-legend" id="phenomena-legend" hidden></div>
             <div id="scene3d"></div>
+            ${renderBaseMapSwitcher(baseMapCatalog, {
+              id: 'scene-basemap-switcher',
+              label: '3D base',
+              className: 'basemap-switcher--floating basemap-switcher--scene',
+            })}
             <div class="scene-attribution" id="scene-attribution">CesiumJS</div>
           </div>
         </article>
@@ -186,6 +193,6 @@ export function renderCity3dPage({ cityId = 'current', embed = false } = {}) {
     `,
     embed,
     surfaceManifest,
-    scripts: renderCityCesiumRuntime({ cityId, baseEndpoint }),
+    scripts: renderCityCesiumRuntime({ cityId, baseEndpoint, baseMapCatalog }),
   })
 }

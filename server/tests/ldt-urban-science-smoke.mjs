@@ -8,7 +8,7 @@ import {
 
 const { Client } = pg
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = ['guanajuato']
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)

@@ -3,7 +3,7 @@ import { getProductionDatabaseUrl } from '../db/migrate.mjs'
 
 const { Client } = pg
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = ['guanajuato']
 const OPEN_LAYER_KEYS = [
   'boundary',
   'buildings',

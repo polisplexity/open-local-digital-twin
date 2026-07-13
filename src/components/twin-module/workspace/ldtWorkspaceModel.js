@@ -20,6 +20,18 @@ export function formatCount(value) {
   return new Intl.NumberFormat('en-US').format(next)
 }
 
+export function formatByteSize(value) {
+  const bytes = Number(value ?? 0)
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  const scaled = bytes / (1024 ** exponent)
+  const formatted = scaled >= 100 || exponent === 0
+    ? new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(scaled)
+    : new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(scaled)
+  return `${formatted} ${units[exponent]}`
+}
+
 export function titleize(value) {
   return String(value ?? '')
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -27,11 +39,23 @@ export function titleize(value) {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-export function statusVariant(status) {
+export function productLifecycleState(status) {
   const value = String(status ?? '').toLowerCase()
-  if (value === 'ready') return 'success'
+  if (['authority-approved', 'authority approved', 'official', 'city-authority'].includes(value)) return 'authority-approved'
+  if (['federated', 'fiware-synced', 'broker-synced'].includes(value)) return 'federated'
+  if (['validated', 'succeeded', 'completed', 'ready', 'pass', 'passed'].includes(value)) return 'validated'
+  if (['generated', 'registered', 'queued', 'partial', 'source-required', 'source-plan-only'].includes(value)) return 'generated'
+  if (['blocked', 'failed', 'error', 'missing'].includes(value)) return 'blocked'
+  if (value === 'construction') return 'construction'
+  if (value === 'lab') return 'lab'
+  return value || 'generated'
+}
+
+export function statusVariant(status) {
+  const value = productLifecycleState(status)
+  if (['validated', 'federated', 'authority-approved'].includes(value)) return 'success'
   if (value === 'blocked') return 'danger'
-  if (value === 'construction') return 'dark'
+  if (value === 'construction') return 'secondary'
   if (value === 'lab') return 'info'
   return 'warning'
 }
@@ -459,6 +483,7 @@ export function buildStandardsRows({ counts, layerCapabilities }) {
   const entityCount = Number(counts.entities ?? 0)
   const ngsiCount = Number(counts.ngsiProjections ?? 0)
   const dcatCount = Number(counts.datasets ?? 0)
+  const modelOutputDatasetCount = Number(counts.modelOutputDatasets ?? 0)
   const ogcCount = Number(counts.ogcCollections ?? 0)
   const vectorCount = Number(layerSummary.vectorTileLayerCount ?? 0)
   const rasterCount = Number(layerSummary.rasterMetadataLayerCount ?? 0)
@@ -484,6 +509,16 @@ export function buildStandardsRows({ counts, layerCapabilities }) {
       coverage: 'Smart Data Models style entities generated from the durable city inventory.',
       next: 'Connect a real Orion-LD or Scorpio broker profile when deployment requires it.',
       status: ngsiCount >= entityCount && entityCount > 0 ? 'ready' : ngsiCount > 0 ? 'partial' : 'blocked',
+    },
+    {
+      key: 'model-output-csv',
+      name: 'Model output CSV',
+      output: 'Derived model table',
+      count: modelOutputDatasetCount,
+      endpoint: '/api/live/current/standards/model-outputs.csv?modelKey=eu-ldt-ecobuild&modelVersion=code-europa-bb710aa-simulated',
+      coverage: 'Tabular export of model outputs attached to canonical city entities.',
+      next: 'Add per-model filters and persistent export packages when more models are attached.',
+      status: modelOutputDatasetCount > 0 ? 'ready' : 'construction',
     },
     {
       key: 'ogc',
@@ -544,6 +579,175 @@ export function buildStandardsRows({ counts, layerCapabilities }) {
       coverage: 'Planned self-test surface for city APIs, versions, examples, and access scopes.',
       next: 'Generate OpenAPI 3.1 and expose an API explorer before city handoff.',
       status: 'blocked',
+    },
+  ]
+}
+
+export function ldtStateVariant(state) {
+  const value = String(state ?? '').toLowerCase()
+  if (value === 'authority-approved') return 'success'
+  if (value === 'federated') return 'primary'
+  if (value === 'validated') return 'info'
+  if (value === 'generated') return 'warning'
+  if (value === 'implemented') return 'dark'
+  return 'secondary'
+}
+
+export const ldtStateDefinitions = [
+  {
+    key: 'implemented',
+    label: 'Implemented',
+    rule: 'The platform has code, route wiring, schema, or a model for the capability, but the active city may not have generated evidence yet.',
+    evidence: 'Source code, API contract, registry entry, or configured module.',
+  },
+  {
+    key: 'generated',
+    label: 'Generated',
+    rule: 'The active city produced a dataset, artifact, projection, endpoint payload, or workflow output.',
+    evidence: 'Runtime counts, registered artifacts, endpoint response, workflow run, or database rows.',
+  },
+  {
+    key: 'validated',
+    label: 'Validated',
+    rule: 'The generated output passed a repeatable smoke, conformance check, checksum, quality gate, or operator review form.',
+    evidence: 'Named test case, quality-gate result, checksum, schema validation, or review record.',
+  },
+  {
+    key: 'federated',
+    label: 'Federated',
+    rule: 'The output is proven to interoperate with an external standard runtime, broker, catalog, or data-space integration.',
+    evidence: 'Broker sync, external catalog publication, OGC/DCAT/NGSI-LD conformance result, or federation job.',
+  },
+  {
+    key: 'authority-approved',
+    label: 'Authority-approved',
+    rule: 'A city authority, accountable operator, or project owner has formally approved the data, state, or publication posture.',
+    evidence: 'Approval record, signed form, official source note, or restricted governance artifact.',
+  },
+]
+
+export function buildLdtComplianceRows({ counts, layerCapabilities, openApiDocument }) {
+  const layerSummary = layerCapabilities?.summary ?? {}
+  const standards = buildStandardsRows({ counts, layerCapabilities })
+  const hasOpenApi = Boolean(openApiDocument?.openapi)
+  const openApiPathCount = Object.keys(openApiDocument?.paths ?? {}).length
+  return [
+    {
+      key: 'dcat-catalog',
+      kind: 'Capability',
+      domain: 'Data catalog',
+      standard: 'DCAT JSON-LD',
+      euMapping: 'Dataset discoverability for Local Digital Twin data spaces and public handoff.',
+      currentState: Number(counts.datasets ?? 0) > 0 ? 'generated' : 'implemented',
+      evidence: `${formatCount(counts.datasets)} catalog datasets`,
+      qualityGate: 'DCAT endpoint returns JSON-LD, every distribution has source, license, format, city, version, and visibility class.',
+      visibility: 'Public metadata by default; restricted distributions allowed per deployment policy.',
+      endpoint: '/api/live/current/standards/dcat',
+      next: 'Add versioned distributions, access policy classes, and catalog smoke coverage.',
+    },
+    {
+      key: 'ogc-features',
+      kind: 'Capability',
+      domain: 'Geospatial API',
+      standard: 'OGC API Features',
+      euMapping: 'Standards-native spatial access for city objects and source layers.',
+      currentState: Number(counts.ogcCollections ?? 0) > 0 ? 'generated' : 'implemented',
+      evidence: `${formatCount(counts.ogcCollections)} feature collections`,
+      qualityGate: 'Collections, items, bbox, pagination, CRS posture, and non-empty sample queries pass contract tests.',
+      visibility: 'Public for open-data collections; internal for sensitive provider layers.',
+      endpoint: '/api/live/current/standards/ogc/collections',
+      next: 'Add formal conformance assertions, examples, and pagination smoke coverage.',
+    },
+    {
+      key: 'ngsi-ld',
+      kind: 'Capability',
+      domain: 'Context data',
+      standard: 'NGSI-LD / FIWARE',
+      euMapping: 'Context broker projection for LDT federation and smart-city app reuse.',
+      currentState: Number(counts.ngsiProjections ?? 0) > 0 ? 'generated' : 'implemented',
+      evidence: `${formatCount(counts.ngsiProjections)} context projections`,
+      qualityGate: 'Entity ids, @context, properties, relationships, observedAt, source metadata, and sample import validate against a broker profile.',
+      visibility: 'Internal until broker sync and publication rules are reviewed.',
+      endpoint: '/api/live/current/standards/ngsi-ld/entities?limit=25',
+      next: 'Connect an Orion-LD or Scorpio broker profile before claiming federation.',
+    },
+    {
+      key: 'json-ld',
+      kind: 'Capability',
+      domain: 'Semantic context',
+      standard: 'JSON-LD contexts',
+      euMapping: 'Linked-data semantics for catalog and context payloads.',
+      currentState: standards.find((row) => row.key === 'jsonld')?.status === 'ready' ? 'generated' : 'implemented',
+      evidence: 'DCAT and NGSI-LD context aliases',
+      qualityGate: 'Context URLs are stable, versioned, dereferenceable, and used consistently by DCAT and NGSI-LD exports.',
+      visibility: 'Public when vocabulary ownership is stable.',
+      endpoint: '/api/live/current/standards/context/dcat',
+      next: 'Publish immutable context URLs and align external vocabulary ownership.',
+    },
+    {
+      key: 'openapi',
+      kind: 'Capability',
+      domain: 'API contract',
+      standard: 'OpenAPI 3.1',
+      euMapping: 'Machine-readable API contract for integrators and public handoff.',
+      currentState: hasOpenApi ? 'generated' : 'implemented',
+      evidence: hasOpenApi ? `${formatCount(openApiPathCount)} documented paths` : 'Runtime endpoint planned or unavailable',
+      qualityGate: 'OpenAPI document validates, covers public routes, includes examples, and route smoke tests prove advertised endpoints.',
+      visibility: 'Public for open APIs; internal for admin/operator routes.',
+      endpoint: '/api/live/current/openapi.json',
+      next: 'Expose explorer, examples, and route-level smoke validation.',
+    },
+    {
+      key: 'viewer-artifacts',
+      kind: 'Capability',
+      domain: 'Viewer delivery',
+      standard: 'MVT / PMTiles / 3D Tiles',
+      euMapping: 'Efficient spatial delivery for map, 3D, and XR city surfaces.',
+      currentState: Number(layerSummary.vectorTileLayerCount ?? 0) > 0 ? 'generated' : 'implemented',
+      evidence: `${formatCount(layerSummary.vectorTileLayerCount)} vector tile layers`,
+      qualityGate: 'MVT, PMTiles, and 3D Tiles artifacts are registered with checksum, version, active flag, URI, and smoke-tested reachability.',
+      visibility: 'Public or internal by artifact policy; raw source files remain controlled.',
+      endpoint: '/api/live/current/layer-capabilities',
+      next: 'Use the artifact registry as the single release ledger for viewer packages.',
+    },
+    {
+      key: 'mims-plus',
+      kind: 'Assessment',
+      domain: 'EU interoperability',
+      standard: 'MIMs Plus',
+      euMapping: 'Minimal interoperability mechanisms: APIs, data models, marketplaces, and portability.',
+      currentState: 'implemented',
+      evidence: 'Readiness model, standards endpoints, and state ladder are represented in the product.',
+      qualityGate: 'A scored MIMs checklist links every claim to API, data-model, marketplace, or portability evidence.',
+      visibility: 'Public summary; detailed evidence may be internal in production.',
+      endpoint: '/operations/compliance',
+      next: 'Turn the mapping into a scored checklist with evidence links and exceptions.',
+    },
+    {
+      key: 'lordimas',
+      kind: 'Assessment',
+      domain: 'EU digital maturity',
+      standard: 'LORDIMAS',
+      euMapping: 'Municipal digital maturity posture for governance, services, data, and interoperability.',
+      currentState: 'implemented',
+      evidence: 'Assessment placeholder with lifecycle states and authority-review boundary.',
+      qualityGate: 'Operator fills review fields, attaches evidence, records reviewer, date, scope, and publication visibility.',
+      visibility: 'Internal by default; public only when the city approves publication.',
+      endpoint: '/operations/compliance',
+      next: 'Add review forms and keep authority-approved separate from automated validation.',
+    },
+    {
+      key: 'fiware-federation',
+      kind: 'Assessment',
+      domain: 'Federation readiness',
+      standard: 'FIWARE broker readiness',
+      euMapping: 'Practical readiness for Orion-LD or Scorpio context-broker operation.',
+      currentState: 'implemented',
+      evidence: 'NGSI-LD projections exist as product capability; no live broker sync is claimed here.',
+      qualityGate: 'Sample entities import into a broker, update, query, and round-trip source metadata without losing geometry or semantics.',
+      visibility: 'Internal until a deployment chooses a broker and data-sharing policy.',
+      endpoint: '/api/live/current/standards/ngsi-ld/entities?limit=25',
+      next: 'Add broker profile configuration and sync-job evidence before using federated state.',
     },
   ]
 }
@@ -621,30 +825,23 @@ export const cityModuleTabs = [
   {
     key: 'inventory',
     label: 'Inventory',
-    domain: 'data-engineering',
-    domainLabel: 'Data engineering',
+    domain: 'data-factory',
+    domainLabel: 'Data factory',
     description: 'Consolidated entities, runtime layers, source evidence, and readiness.',
   },
   {
     key: 'sources',
     label: 'Sources',
-    domain: 'data-engineering',
-    domainLabel: 'Data engineering',
+    domain: 'data-factory',
+    domainLabel: 'Data factory',
     description: 'Open datasets, provenance, licenses, and evidence flow.',
   },
   {
     key: 'standards',
     label: 'Standards',
-    domain: 'data-engineering',
-    domainLabel: 'Data engineering',
+    domain: 'data-factory',
+    domainLabel: 'Data factory',
     description: 'DCAT, OGC, NGSI-LD, FIWARE, vector delivery, and API handoff outputs.',
-  },
-  {
-    key: 'operations',
-    label: 'Operations',
-    domain: 'data-engineering',
-    domainLabel: 'Data engineering',
-    description: 'Ingestion jobs, API usage, telemetry, workflow runs, and approvals.',
   },
   {
     key: 'analysis',
@@ -669,9 +866,9 @@ export const workspaceDomainGroups = [
     summary: 'Control room',
   },
   {
-    key: 'data-engineering',
-    label: 'Data engineering',
-    summary: 'Inventory, sources, standards, APIs',
+    key: 'data-factory',
+    label: 'Data factory',
+    summary: 'Inventory, sources, standards, artifacts',
   },
   {
     key: 'city-analysis',
@@ -681,10 +878,13 @@ export const workspaceDomainGroups = [
 ]
 
 export const operationViewTabs = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'apis', label: 'APIs' },
-  { key: 'telemetry', label: 'Telemetry' },
-  { key: 'workflows', label: 'Workflows' },
+  { key: 'overview', label: 'Overview', href: '/operations' },
+  { key: 'apis', label: 'APIs', href: '/operations/apis' },
+  { key: 'telemetry', label: 'Telemetry', href: '/operations/telemetry' },
+  { key: 'ingestion', label: 'Data Factory', href: '/operations/ingestion' },
+  { key: 'eu-ldt', label: 'EU LDT', href: '/operations/eu-ldt' },
+  { key: 'workflows', label: 'Workflows', href: '/operations/workflows' },
+  { key: 'compliance', label: 'LDT Compliance', href: '/operations/compliance' },
 ]
 
 export const visualSurfaces = [

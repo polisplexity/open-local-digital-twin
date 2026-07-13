@@ -1,6 +1,6 @@
 import { closeSharedProductionPool, withProductionClient as withClient } from './serviceDatabase.mjs'
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = []
 const STANDARD_KEY = 'society-culture-core'
 const STANDARD_VERSION = '0.1.0'
 
@@ -547,7 +547,7 @@ function buildObservations(metrics) {
       sourceQuality: 'product-readiness',
       privacy: 'aggregate',
       method: { formula: 'platform_has_participation_surface_but_no_city_events_connected' },
-      uncertainty: { status: 'qualitative', reason: 'Participation routes exist, but no Kharkiv participation process is connected.' },
+      uncertainty: { status: 'qualitative', reason: 'Participation routes exist, but no city participation process is connected.' },
     },
   ]
 

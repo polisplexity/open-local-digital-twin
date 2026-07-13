@@ -22,9 +22,9 @@ const SESSION_SHORT_TTL_MS = 1000 * 60 * 60 * 12
 const ACTIVATION_TTL_MS = 1000 * 60 * 60 * 48
 const RESET_TTL_MS = 1000 * 60 * 60 * 2
 const PASSWORD_KEYLEN = 64
-const AUTH_SECRET = process.env.TWIN_STUDIO_AUTH_SECRET || 'open-local-digital-twin-dev-secret'
+const AUTH_SECRET = process.env.TWIN_STUDIO_AUTH_SECRET || 'open-local-digital-twin-dev-secret-change-me'
 const RAW_EMAIL_MODE = String(process.env.TWIN_STUDIO_EMAIL_MODE || 'console').trim().toLowerCase()
-const ADMIN_EMAILS = String(process.env.TWIN_STUDIO_ADMIN_EMAILS || 'admin@example.org')
+const ADMIN_EMAILS = String(process.env.TWIN_STUDIO_ADMIN_EMAILS || '')
   .split(',')
   .map((value) => value.trim().toLowerCase())
   .filter(Boolean)
@@ -469,9 +469,9 @@ function readBoolEnv(name, fallback) {
 
 function resolveSmtpConfig() {
   const host = readEnv('TWIN_STUDIO_SMTP_HOST', readEnv('EMAIL_HOST', readEnv('DJANGO_EMAIL_HOST', '')))
-  const portRaw = readEnv('TWIN_STUDIO_SMTP_PORT', readEnv('EMAIL_PORT', readEnv('DJANGO_EMAIL_PORT', '587')))
-  const port = Number.parseInt(portRaw, 10) || 587
-  const secure = readBoolEnv('TWIN_STUDIO_SMTP_SECURE', false)
+  const portRaw = readEnv('TWIN_STUDIO_SMTP_PORT', readEnv('EMAIL_PORT', readEnv('DJANGO_EMAIL_PORT', '465')))
+  const port = Number.parseInt(portRaw, 10) || 465
+  const secure = readBoolEnv('TWIN_STUDIO_SMTP_SECURE', port === 465)
   const user = readEnv(
     'TWIN_STUDIO_SMTP_USER',
     readEnv('EMAIL_HOST_USER', readEnv('DJANGO_EMAIL_HOST_USER', '')),
@@ -520,6 +520,47 @@ function resolveUserRoles(email, requestedRole) {
     roles.push('platform-admin')
   }
   return Array.from(new Set(roles))
+}
+
+function createSessionForUser(user, { cityId, rememberMe = true } = {}) {
+  const isAdmin = Boolean(user.roles?.includes('platform-admin'))
+  const enabledCityIds = getCityRegistry().cities
+    .filter((entry) => entry.enabled !== false)
+    .map((entry) => entry.id)
+  const allowedCityIds = isAdmin
+    ? enabledCityIds
+    : user.allowedCityIds?.length ? user.allowedCityIds : [user.primaryCityId]
+  const fallbackCityId = allowedCityIds.includes(user.primaryCityId)
+    ? user.primaryCityId
+    : allowedCityIds[0]
+  const selectedCityId = allowedCityIds.includes(cityId) ? cityId : fallbackCityId
+  const city = getEnabledCity(selectedCityId)
+  if (!city) {
+    throw new Error('CITY_NOT_AVAILABLE')
+  }
+
+  const rawToken = createRawToken()
+  const expiresAt = plusMs(rememberMe ? SESSION_TTL_MS : SESSION_SHORT_TTL_MS)
+  const sessionsState = getSessionsState()
+  sessionsState.sessions.push({
+    id: crypto.randomUUID(),
+    userId: user.id,
+    tokenHash: hashToken(rawToken),
+    cityId: selectedCityId,
+    createdAt: nowIso(),
+    lastSeenAt: nowIso(),
+    expiresAt,
+  })
+  setSessionsState(sessionsState)
+
+  return {
+    rawToken,
+    session: {
+      cityId: selectedCityId,
+      expiresAt,
+    },
+    user: publicUser(user),
+  }
 }
 
 function cleanupExpiredState() {
@@ -981,48 +1022,84 @@ export function createLoginSession({ email, password, cityId, rememberMe = true 
     throw new Error('INVALID_CREDENTIALS')
   }
 
-  const isAdmin = Boolean(user.roles?.includes('platform-admin'))
-  const enabledCityIds = getCityRegistry().cities
-    .filter((entry) => entry.enabled !== false)
-    .map((entry) => entry.id)
-  const allowedCityIds = isAdmin
-    ? enabledCityIds
-    : user.allowedCityIds?.length ? user.allowedCityIds : [user.primaryCityId]
-  const fallbackCityId = allowedCityIds.includes(user.primaryCityId)
-    ? user.primaryCityId
-    : allowedCityIds[0]
-  const selectedCityId = allowedCityIds.includes(cityId) ? cityId : fallbackCityId
-  const city = getEnabledCity(selectedCityId)
-  if (!city) {
-    throw new Error('CITY_NOT_AVAILABLE')
-  }
-
-  const rawToken = createRawToken()
-  const sessionsState = getSessionsState()
-  sessionsState.sessions.push({
-    id: crypto.randomUUID(),
-    userId: user.id,
-    tokenHash: hashToken(rawToken),
-    cityId: selectedCityId,
-    createdAt: nowIso(),
-    lastSeenAt: nowIso(),
-    expiresAt: plusMs(rememberMe ? SESSION_TTL_MS : SESSION_SHORT_TTL_MS),
-  })
-  setSessionsState(sessionsState)
-
   user.lastLoginAt = nowIso()
   user.updatedAt = nowIso()
   usersState.users = usersState.users.map((entry) => (entry.id === user.id ? user : entry))
   setUsersState(usersState)
 
-  return {
-    rawToken,
-    session: {
-      cityId: selectedCityId,
-      expiresAt: plusMs(rememberMe ? SESSION_TTL_MS : SESSION_SHORT_TTL_MS),
-    },
-    user: publicUser(user),
+  return createSessionForUser(user, { cityId, rememberMe })
+}
+
+export function createExternalIdentitySession({
+  providerKey,
+  subject,
+  email,
+  fullName,
+  roles = [],
+  primaryCityId,
+  allowedCityIds = [],
+  cityId,
+  rememberMe = true,
+  rawClaims = {},
+} = {}) {
+  cleanupExpiredState()
+  const normalizedEmail = normalizeEmail(email)
+  if (!normalizedEmail || !normalizedEmail.includes('@')) {
+    throw new Error('EXTERNAL_IDENTITY_EMAIL_REQUIRED')
   }
+
+  const registry = getCityRegistry()
+  const enabledCityIds = registry.cities.filter((entry) => entry.enabled !== false).map((entry) => entry.id)
+  const requestedAllowedCities = Array.from(new Set(
+    [primaryCityId, ...allowedCityIds]
+      .map((entry) => String(entry ?? '').trim())
+      .filter(Boolean),
+  ))
+  const filteredAllowedCities = requestedAllowedCities.filter((entry) => enabledCityIds.includes(entry))
+  const fallbackCityId = filteredAllowedCities[0] ?? registry.activeCityId
+  if (!getEnabledCity(fallbackCityId)) throw new Error('EXTERNAL_IDENTITY_CITY_NOT_AVAILABLE')
+
+  const normalizedRoles = Array.from(new Set(
+    roles.map((entry) => String(entry ?? '').trim()).filter(Boolean),
+  ))
+  const role = normalizedRoles[0] ?? 'municipal-reviewer'
+  const usersState = getUsersState()
+  const existingUser = usersState.users.find((entry) => entry.email === normalizedEmail)
+  const passwordState = existingUser?.passwordHash && existingUser?.passwordSalt
+    ? { hash: existingUser.passwordHash, salt: existingUser.passwordSalt }
+    : createPasswordHash(crypto.randomBytes(32).toString('base64url'))
+  const user = existingUser ?? {
+    id: crypto.randomUUID(),
+    createdAt: nowIso(),
+  }
+
+  user.email = normalizedEmail
+  user.fullName = normalizeName(fullName) || normalizedEmail
+  user.passwordHash = passwordState.hash
+  user.passwordSalt = passwordState.salt
+  user.status = 'active'
+  user.role = role
+  user.roles = normalizedRoles.length ? normalizedRoles : resolveUserRoles(normalizedEmail, role)
+  user.primaryCityId = fallbackCityId
+  user.allowedCityIds = filteredAllowedCities.length ? filteredAllowedCities : [fallbackCityId]
+  user.activatedAt = user.activatedAt ?? nowIso()
+  user.lastLoginAt = nowIso()
+  user.updatedAt = nowIso()
+  user.externalIdentity = {
+    providerKey: String(providerKey ?? '').trim(),
+    subject: String(subject ?? '').trim(),
+    lastClaimsAt: nowIso(),
+    claims: rawClaims,
+  }
+
+  if (existingUser) {
+    usersState.users = usersState.users.map((entry) => (entry.id === user.id ? user : entry))
+  } else {
+    usersState.users.push(user)
+  }
+  setUsersState(usersState)
+
+  return createSessionForUser(user, { cityId: cityId ?? fallbackCityId, rememberMe })
 }
 
 export function getPlatformAuthContext(request) {

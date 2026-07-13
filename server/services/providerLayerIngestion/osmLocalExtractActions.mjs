@@ -304,7 +304,8 @@ export async function ingestOsmLocalExtractLayer(cityConfig, layerKey, body = {}
   const existingJobId = compact(body.existingJobId ?? body.existing_job_id)
   if (!existingJobId) throw new Error('INGESTION_JOB_ID_REQUIRED_FOR_OSM_LOCAL_EXTRACT')
 
-  const cityId = compact(cityConfig?.id, compact(body.cityId ?? body.city_id, 'kharkiv'))
+  const cityId = compact(cityConfig?.id, compact(body.cityId ?? body.city_id))
+  if (!cityId) throw new Error('CITY_ID_REQUIRED_FOR_OSM_LOCAL_EXTRACT')
   const rawSchema = compact(
     body.rawSchema ?? body.raw_schema ?? body.metadata?.rawSchema ?? body.metadata?.raw_schema,
     defaultRawSchema(cityId),

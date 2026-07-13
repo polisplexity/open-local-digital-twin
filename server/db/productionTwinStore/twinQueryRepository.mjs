@@ -1,15 +1,29 @@
 import { getProductionPool } from '../postgisPool.mjs'
 import { parseMaybeJson } from './repositoryUtils.mjs'
 import {
+  compilePostgisSqlWhere,
   compileTwinQueryWhere,
   normalizeTwinQuery,
+  normalizePostgisSqlText,
   twinQueryContract,
 } from '../../services/twinQuery/twinQueryCompiler.mjs'
+import { twinQueryRuntimeClassPriorityCaseSql } from '../../services/semanticLayer/semanticVocabularyAdapter.mjs'
+import { hashTwinQuery } from './analysisSelectionRepository.mjs'
 
 const MAX_TWIN_QUERY_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_MAX_LIMIT', 300000)
-const DEFAULT_TWIN_QUERY_TILE_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_MVT_DEFAULT_LIMIT', 20000)
-const MAX_TWIN_QUERY_TILE_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_MVT_MAX_LIMIT', 100000)
+const DEFAULT_TWIN_QUERY_TILE_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_MVT_DEFAULT_LIMIT', 5000)
+const MAX_TWIN_QUERY_TILE_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_MVT_MAX_LIMIT', 20000)
 const MAX_TWIN_QUERY_SELECTION_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_SELECTION_MAX_LIMIT', 300000)
+const DEFAULT_TWIN_QUERY_GEOJSON_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_GEOJSON_DEFAULT_LIMIT', 5000)
+const MAX_TWIN_QUERY_GEOJSON_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_GEOJSON_MAX_LIMIT', 20000)
+const DEFAULT_TWIN_QUERY_CESIUM_PRIMITIVES_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_CESIUM_PRIMITIVES_DEFAULT_LIMIT', 50000)
+const MAX_TWIN_QUERY_CESIUM_PRIMITIVES_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_CESIUM_PRIMITIVES_MAX_LIMIT', 50000)
+const DEFAULT_TWIN_QUERY_SCENE_MANIFEST_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_SCENE_MANIFEST_DEFAULT_LIMIT', 5000)
+const MAX_TWIN_QUERY_SCENE_MANIFEST_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_SCENE_MANIFEST_MAX_LIMIT', 20000)
+const DEFAULT_TWIN_QUERY_CITY_SQL_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_CITY_SQL_DEFAULT_LIMIT', 5000)
+const MAX_TWIN_QUERY_CITY_SQL_LIMIT = integerEnv('TWIN_STUDIO_TWIN_QUERY_CITY_SQL_MAX_LIMIT', 20000)
+const TWIN_QUERY_CITY_SQL_TIMEOUT_MS = integerEnv('TWIN_STUDIO_TWIN_QUERY_CITY_SQL_TIMEOUT_MS', 5000)
+const HIGH_CAPACITY_VISUAL_INTENTS = new Set(['visual-capacity', 'stress-city-3d', 'stress-civic-xr'])
 
 function integerEnv(name, fallback) {
   const number = Math.trunc(Number(process.env[name]))
@@ -36,9 +50,507 @@ function emptyTwinQuerySummary(extra = {}) {
   }
 }
 
+function geojsonTransportPolicy(query = {}) {
+  const transport = String(query.render?.transport ?? '').trim()
+  const active = query.render?.mode !== 'count' && (!transport || transport === 'geojson')
+  if (!active) {
+    return {
+      active: false,
+      transport,
+      requestedMaxFeatures: Number(query.render?.maxFeatures ?? 0),
+      effectiveMaxFeatures: Number(query.render?.maxFeatures ?? 0),
+      limitApplied: false,
+    }
+  }
+
+  const requested = Math.trunc(Number(query.render?.maxFeatures))
+  const requestedMaxFeatures = Number.isFinite(requested) && requested > 0
+    ? requested
+    : DEFAULT_TWIN_QUERY_GEOJSON_LIMIT
+  const legacyDefaultRequest = !transport && requestedMaxFeatures >= MAX_TWIN_QUERY_LIMIT
+  const desiredMaxFeatures = legacyDefaultRequest
+    ? DEFAULT_TWIN_QUERY_GEOJSON_LIMIT
+    : requestedMaxFeatures
+  const effectiveMaxFeatures = Math.max(1, Math.min(MAX_TWIN_QUERY_GEOJSON_LIMIT, desiredMaxFeatures))
+
+  return {
+    active: true,
+    transport: 'geojson',
+    mode: 'preview',
+    requestedMaxFeatures,
+    effectiveMaxFeatures,
+    limitApplied: legacyDefaultRequest || effectiveMaxFeatures < requestedMaxFeatures,
+    recommendedTransports: ['mvt', 'pmtiles', '3d-tiles', 'scene-manifest'],
+  }
+}
+
+function geojsonTransportPolicySummary(policy, totalCount, returned, truncated) {
+  if (!policy?.active) return null
+  const resultCount = Number(totalCount ?? 0)
+  const returnedCount = Number(returned ?? 0)
+  const effectiveMaxFeatures = Number(policy.effectiveMaxFeatures ?? returnedCount)
+  const limitApplied = Boolean(policy.limitApplied || truncated || (resultCount > 0 && returnedCount < resultCount))
+  return {
+    transport: 'geojson',
+    mode: policy.mode || 'preview',
+    limitApplied,
+    requestedMaxFeatures: policy.requestedMaxFeatures,
+    effectiveMaxFeatures,
+    returned: returnedCount,
+    resultCount,
+    recommendedTransports: policy.recommendedTransports,
+    warning: limitApplied
+      ? `GeoJSON preview limited to ${effectiveMaxFeatures} features. Use MVT, PMTiles, 3D Tiles, or scene manifest for full-city viewers.`
+      : `GeoJSON preview mode is capped at ${effectiveMaxFeatures} features. Use native viewer transports for full-city rendering.`,
+  }
+}
+
+function directVisualTransportBudget(transport) {
+  if (transport === 'cesium-primitives') {
+    return {
+      defaultMaxFeatures: DEFAULT_TWIN_QUERY_CESIUM_PRIMITIVES_LIMIT,
+      maxFeatures: MAX_TWIN_QUERY_CESIUM_PRIMITIVES_LIMIT,
+      recommendedTransports: ['analysis-selection', '3d-tiles', 'viewer-artifact'],
+    }
+  }
+  if (transport === 'scene-manifest') {
+    return {
+      defaultMaxFeatures: DEFAULT_TWIN_QUERY_SCENE_MANIFEST_LIMIT,
+      maxFeatures: MAX_TWIN_QUERY_SCENE_MANIFEST_LIMIT,
+      recommendedTransports: ['analysis-selection', 'xr-scene-chunks', '3d-tiles', 'viewer-artifact'],
+    }
+  }
+  return null
+}
+
+function planTwinQueryVisualTransport(query = {}, { intent = '', metadata = {} } = {}) {
+  const transport = String(query.render?.transport ?? '').trim()
+  const budget = directVisualTransportBudget(transport)
+  if (!budget || query.render?.mode === 'count') {
+    return { query, policy: null }
+  }
+
+  const requested = Math.trunc(Number(query.render?.maxFeatures))
+  const requestedMaxFeatures = Number.isFinite(requested) && requested > 0
+    ? requested
+    : budget.defaultMaxFeatures
+  const highCapacity = HIGH_CAPACITY_VISUAL_INTENTS.has(String(intent || '')) || metadata.allowHighCapacityVisualPayload === true
+  const effectiveMaxFeatures = highCapacity
+    ? Math.max(1, Math.min(MAX_TWIN_QUERY_LIMIT, requestedMaxFeatures))
+    : Math.max(1, Math.min(budget.maxFeatures, requestedMaxFeatures))
+
+  return {
+    query: {
+      ...query,
+      render: {
+        ...(query.render || {}),
+        maxFeatures: effectiveMaxFeatures,
+      },
+    },
+    policy: {
+      transport,
+      mode: 'direct-visual-payload',
+      requestedMaxFeatures,
+      effectiveMaxFeatures,
+      maxAllowedFeatures: highCapacity ? MAX_TWIN_QUERY_LIMIT : budget.maxFeatures,
+      limitApplied: effectiveMaxFeatures < requestedMaxFeatures,
+      highCapacity,
+      recommendedTransports: budget.recommendedTransports,
+    },
+  }
+}
+
+function directVisualTransportPolicySummary(policy, totalCount, returned, truncated) {
+  if (!policy) return null
+  const resultCount = Number(totalCount ?? 0)
+  const returnedCount = Number(returned ?? 0)
+  return {
+    ...policy,
+    resultCount,
+    returned: returnedCount,
+    truncated: Boolean(truncated || policy.limitApplied || (resultCount > 0 && returnedCount < resultCount)),
+    note: policy.limitApplied
+      ? 'TwinQuery capped the direct 3D/XR payload to protect browser memory. Persist the query as an analysis selection and materialize a viewer artifact for larger results.'
+      : 'TwinQuery allowed this direct 3D/XR payload inside the active visual budget.',
+  }
+}
+
+function selectionReferenceTransportPolicySummary(query = {}, totalCount = 0) {
+  const transport = String(query.render?.transport ?? '').trim()
+  if (transport !== 'selection-reference') return null
+  return {
+    transport,
+    mode: 'reference-only',
+    resultCount: Number(totalCount ?? 0),
+    returned: 0,
+    truncated: false,
+    featurePayload: false,
+    recommendedTransports: ['analysis-selection', '3d-tiles', 'viewer-artifact'],
+    note: 'TwinQuery returned a selection reference for 3D surfaces without returning render geometry. Materialize the query as an analysis selection or viewer artifact before full-city 3D highlighting.',
+  }
+}
+
+function twinQueryNeedsFeaturePayload(query = {}) {
+  const transport = String(query.render?.transport ?? '').trim()
+  return query.render?.mode !== 'count' && !['mvt', 'metadata', 'selection-reference'].includes(transport)
+}
+
+function citySqlLimit(query = {}) {
+  const requested = Math.trunc(Number(query.render?.maxFeatures))
+  const fallback = DEFAULT_TWIN_QUERY_CITY_SQL_LIMIT
+  const value = Number.isFinite(requested) && requested > 0 ? requested : fallback
+  return Math.max(1, Math.min(MAX_TWIN_QUERY_CITY_SQL_LIMIT, value))
+}
+
+function geometryFromCitySqlRow(row = {}) {
+  const geometry = row.__geometry ?? row.geometry_geojson ?? row.geometry ?? null
+  if (!geometry) return null
+  if (typeof geometry === 'object') return geometry
+  return parseMaybeJson(geometry, null)
+}
+
+function semanticClassFromCitySqlRow(row = {}) {
+  return row.semantic_class || row.semanticClass || (
+    row.entity_type === 'building' ? 'buildings' :
+    row.entity_type === 'road' ? 'roads' :
+    row.layer_key || row.display_layer_key || 'features'
+  )
+}
+
+function layerKeyFromCitySqlRow(row = {}) {
+  return row.display_layer_key || row.layer_key || row.layerKey || semanticClassFromCitySqlRow(row)
+}
+
+function objectIdFromCitySqlRow(row = {}, index = 0) {
+  return String(row.object_id || row.objectId || row.stable_id || row.stableId || row.id || `city-sql-row-${index + 1}`)
+}
+
+function citySqlRowToFeature(row = {}, index = 0) {
+  const geometry = geometryFromCitySqlRow(row)
+  if (!geometry) return null
+  const objectId = objectIdFromCitySqlRow(row, index)
+  const semanticClass = semanticClassFromCitySqlRow(row)
+  const layerKey = layerKeyFromCitySqlRow(row)
+  const { __geometry, geometry_geojson, geom, geometry: rowGeometry, ...attributes } = row
+  return {
+    type: 'Feature',
+    id: objectId,
+    properties: {
+      ...attributes,
+      objectId,
+      stableId: row.stable_id || row.stableId || objectId,
+      label: row.label || row.name || objectId,
+      semanticClass,
+      layerKey,
+      queryLayerKey: layerKey,
+      entityType: row.entity_type || row.entityType || null,
+      authorityStatus: row.authority_status || row.authorityStatus || null,
+      confidence: row.confidence || null,
+      sourceCoverageStatus: row.source_coverage_status || row.sourceCoverageStatus || null,
+      provider: row.provider || null,
+      modelEnrichments: row.model_enrichments && typeof row.model_enrichments === 'object' ? row.model_enrichments : {},
+    },
+    geometry,
+  }
+}
+
+function citySqlTableColumns(rows = []) {
+  return unique(rows.flatMap((row) => Object.keys(row || {}))).filter((column) => (
+    !['__geometry', 'geom', 'geometry', 'geometry_geojson'].includes(column)
+  ))
+}
+
+function citySqlTableRow(row = {}) {
+  const { __geometry, geometry_geojson, geom, geometry, ...tableRow } = row
+  return tableRow
+}
+
+function incrementCount(target, key) {
+  const normalized = compactText(key, 'features')
+  target[normalized] = Number(target[normalized] ?? 0) + 1
+}
+
+function citySqlLimitedCounts(rows = []) {
+  const countsBySemanticClass = {}
+  const countsByLayer = {}
+  rows.forEach((row) => {
+    incrementCount(countsBySemanticClass, semanticClassFromCitySqlRow(row))
+    incrementCount(countsByLayer, layerKeyFromCitySqlRow(row))
+  })
+  return { countsBySemanticClass, countsByLayer }
+}
+
+function citySqlRequiresCityIdError(error) {
+  return error?.code === '42703' && String(error?.message ?? '').includes('city_id')
+}
+
+function citySqlMissingGeomError(error) {
+  return error?.code === '42703' && String(error?.message ?? '').includes('geom')
+}
+
+async function executeReadOnlyCitySql(pool, cityId, query = {}, limit = DEFAULT_TWIN_QUERY_CITY_SQL_LIMIT) {
+  const sqlText = normalizePostgisSqlText(query.sqlText)
+  if (!sqlText) {
+    throw new Error('POSTGIS_SQL_SELECT_REQUIRED')
+  }
+
+  const effectiveLimit = Math.max(1, Math.min(MAX_TWIN_QUERY_CITY_SQL_LIMIT, Math.trunc(Number(limit)) || DEFAULT_TWIN_QUERY_CITY_SQL_LIMIT))
+  const runWrappedQuery = async (includeGeometry = true) => {
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN READ ONLY')
+      await client.query(`SET LOCAL statement_timeout = '${Math.max(1, TWIN_QUERY_CITY_SQL_TIMEOUT_MS)}ms'`)
+      const wrappedSql = includeGeometry
+        ? `
+          WITH city_sql AS MATERIALIZED (
+            ${sqlText}
+          ),
+          city_filtered AS (
+            SELECT *
+            FROM city_sql
+            WHERE city_id = $2
+          ),
+          query_bounds AS (
+            SELECT ST_Extent(geom) AS extent
+            FROM city_filtered
+            WHERE geom IS NOT NULL
+              AND NOT ST_IsEmpty(geom)
+          ),
+          limited AS (
+            SELECT *
+            FROM city_filtered
+            LIMIT $1
+          )
+          SELECT
+            (SELECT count(*)::int FROM city_filtered) AS total_count,
+            (
+              SELECT CASE
+                WHEN extent IS NULL THEN NULL
+                ELSE ST_AsGeoJSON(ST_SetSRID(extent::geometry, 4326))::jsonb
+              END
+              FROM query_bounds
+            ) AS bounds_geometry,
+            COALESCE(
+              jsonb_agg(
+                to_jsonb(limited) || jsonb_build_object(
+                  '__geometry',
+                  CASE
+                    WHEN limited.geom IS NULL THEN NULL
+                    ELSE ST_AsGeoJSON(limited.geom)::jsonb
+                  END
+                )
+              ),
+              '[]'::jsonb
+            ) AS rows
+          FROM limited
+        `
+        : `
+          WITH city_sql AS MATERIALIZED (
+            ${sqlText}
+          ),
+          city_filtered AS (
+            SELECT *
+            FROM city_sql
+            WHERE city_id = $2
+          ),
+          limited AS (
+            SELECT *
+            FROM city_filtered
+            LIMIT $1
+          )
+          SELECT
+            (SELECT count(*)::int FROM city_filtered) AS total_count,
+            NULL::jsonb AS bounds_geometry,
+            COALESCE(jsonb_agg(to_jsonb(limited)), '[]'::jsonb) AS rows
+          FROM limited
+        `
+      const result = await client.query(wrappedSql, [effectiveLimit + 1, cityId])
+      await client.query('COMMIT')
+      const row = result.rows[0] ?? {}
+      const rawRows = Array.isArray(row.rows) ? row.rows : []
+      const rows = rawRows.slice(0, effectiveLimit)
+      return {
+        geometryEnabled: includeGeometry,
+        totalCount: Number(row.total_count ?? 0),
+        rows,
+        boundsGeometry: row.bounds_geometry ?? null,
+        truncated: rawRows.length > effectiveLimit || Number(row.total_count ?? 0) > rows.length,
+      }
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK')
+      } catch {
+        // Ignore rollback errors; the original query error is more useful.
+      }
+      throw error
+    } finally {
+      client.release()
+    }
+  }
+
+  try {
+    return await runWrappedQuery(true)
+  } catch (error) {
+    if (citySqlRequiresCityIdError(error)) {
+      throw new Error('POSTGIS_SQL_SELECT_REQUIRES_CITY_ID')
+    }
+    if (!citySqlMissingGeomError(error)) {
+      throw error
+    }
+  }
+
+  try {
+    return await runWrappedQuery(false)
+  } catch (error) {
+    if (citySqlRequiresCityIdError(error)) {
+      throw new Error('POSTGIS_SQL_SELECT_REQUIRES_CITY_ID')
+    }
+    throw error
+  }
+}
+
+async function executeReadOnlyCitySqlGeometrySummary(pool, cityId, query = {}) {
+  const sqlText = normalizePostgisSqlText(query.sqlText)
+  if (!sqlText) {
+    throw new Error('POSTGIS_SQL_SELECT_REQUIRED')
+  }
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN READ ONLY')
+    await client.query(`SET LOCAL statement_timeout = '${Math.max(1, TWIN_QUERY_CITY_SQL_TIMEOUT_MS)}ms'`)
+    const result = await client.query(
+      `
+        WITH city_sql AS MATERIALIZED (
+          ${sqlText}
+        ),
+        city_filtered AS (
+          SELECT *
+          FROM city_sql
+          WHERE city_id = $1
+        ),
+        query_bounds AS (
+          SELECT ST_Extent(geom) AS extent
+          FROM city_filtered
+          WHERE geom IS NOT NULL
+            AND NOT ST_IsEmpty(geom)
+        ),
+        row_properties AS (
+          SELECT to_jsonb(city_filtered) AS properties
+          FROM city_filtered
+        ),
+        counts_by_class AS (
+          SELECT COALESCE(properties->>'semantic_class', properties->>'semanticClass', 'features') AS semantic_class, count(*)::int AS feature_count
+          FROM row_properties
+          GROUP BY COALESCE(properties->>'semantic_class', properties->>'semanticClass', 'features')
+        ),
+        counts_by_layer AS (
+          SELECT COALESCE(properties->>'display_layer_key', properties->>'layer_key', properties->>'layerKey', properties->>'semantic_class', 'features') AS display_layer_key, count(*)::int AS feature_count
+          FROM row_properties
+          GROUP BY COALESCE(properties->>'display_layer_key', properties->>'layer_key', properties->>'layerKey', properties->>'semantic_class', 'features')
+        )
+        SELECT
+          (SELECT count(*)::int FROM city_filtered) AS total_count,
+          COALESCE(
+            (SELECT jsonb_object_agg(semantic_class, feature_count) FROM counts_by_class),
+            '{}'::jsonb
+          ) AS counts_by_semantic_class,
+          COALESCE(
+            (SELECT jsonb_object_agg(display_layer_key, feature_count) FROM counts_by_layer),
+            '{}'::jsonb
+          ) AS counts_by_layer,
+          (
+            SELECT CASE
+              WHEN extent IS NULL THEN NULL
+              ELSE ST_AsGeoJSON(ST_SetSRID(extent::geometry, 4326))::jsonb
+            END
+            FROM query_bounds
+          ) AS bounds_geometry
+      `,
+      [cityId],
+    )
+    await client.query('COMMIT')
+    const row = result.rows[0] ?? {}
+    return {
+      totalCount: Number(row.total_count ?? 0),
+      countsBySemanticClass: row.counts_by_semantic_class ?? {},
+      countsByLayer: row.counts_by_layer ?? {},
+      boundsGeometry: row.bounds_geometry ?? null,
+    }
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK')
+    } catch {
+      // Ignore rollback errors; the original query error is more useful.
+    }
+    if (citySqlRequiresCityIdError(error)) {
+      throw new Error('POSTGIS_SQL_SELECT_REQUIRES_CITY_ID')
+    }
+    if (citySqlMissingGeomError(error)) {
+      throw new Error('POSTGIS_SQL_SELECT_REQUIRES_GEOM')
+    }
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
+function selectionReferenceForQuery({ cityId, query, summary = {}, surface, intent } = {}) {
+  const transport = String(query?.render?.transport ?? '').trim()
+  if (transport !== 'selection-reference') return null
+  const cityPath = encodeURIComponent(cityId || 'current')
+  return {
+    kind: 'twin-query-selection-reference',
+    version: '2026-06-29',
+    cityId,
+    queryHash: hashTwinQuery(query),
+    surface,
+    intent,
+    resultCount: Number(summary.resultCount ?? 0),
+    returned: 0,
+    bounds: summary.bounds ?? null,
+    countsBySemanticClass: summary.countsBySemanticClass ?? {},
+    countsByLayer: summary.countsByLayer ?? {},
+    countsByClause: summary.countsByClause ?? {},
+    renderPlan: {
+      base: 'registered-3d-tiles',
+      overlay: 'selection-style-or-filter',
+      featurePayload: false,
+      note: 'Use active 3D Tiles for base city geometry; use this query hash/scope to materialize or highlight a selection without resending city geometry.',
+    },
+    materialization: {
+      analysisSelection: {
+        method: 'POST',
+        href: `/api/live/${cityPath}/analysis-selections/query`,
+        body: {
+          query,
+          surface,
+          intent,
+          selectionKind: 'twinql-selection',
+        },
+      },
+      viewerArtifacts: {
+        method: 'POST',
+        href: `/api/live/${cityPath}/operations/data-factory/viewer-artifacts`,
+        note: 'Future heavy path: materialize query-scoped 3D Tiles or selection overlays through Data Factory.',
+      },
+    },
+    artifacts: {
+      threeDTilesets: {
+        href: `/api/live/${cityPath}/3d-tilesets?status=ready&limit=10`,
+        transport: '3d-tiles',
+      },
+    },
+  }
+}
+
 function compactText(value, fallback = '') {
   const text = String(value ?? '').trim()
   return text || fallback
+}
+
+function unique(values = []) {
+  return Array.from(new Set(values.filter(Boolean)))
 }
 
 function normalizeSurface(value) {
@@ -48,7 +560,7 @@ function normalizeSurface(value) {
 
 function normalizeIntent(value) {
   const intent = compactText(value, 'analysis')
-  return ['inspection', 'analysis', 'simulation', 'operations', 'embed', 'export', 'unknown'].includes(intent)
+  return ['inspection', 'analysis', 'simulation', 'operations', 'embed', 'export', 'visual-capacity', 'stress-city-3d', 'stress-civic-xr', 'unknown'].includes(intent)
     ? intent
     : 'unknown'
 }
@@ -89,18 +601,7 @@ function scopeCteSql(scope, addParam) {
 }
 
 function layerPriorityCaseSql() {
-  return `
-    CASE semantic_class
-      WHEN 'boundary' THEN 0
-      WHEN 'roads' THEN 1
-      WHEN 'greenBlue' THEN 2
-      WHEN 'accessSeeds' THEN 3
-      WHEN 'places' THEN 4
-      WHEN 'buildings' THEN 5
-      WHEN 'semanticPacks' THEN 6
-      ELSE 9
-    END
-  `
+  return twinQueryRuntimeClassPriorityCaseSql('semantic_class')
 }
 
 function clippedGeometrySql(sourceGeom = 'co.geom', scopeGeom = 'qs.geom', scopeKeySql = null) {
@@ -390,6 +891,9 @@ function rowToFeature(row) {
       buildingType: row.building_type,
       heightMeters: row.height_m == null ? null : Number(row.height_m),
       floors: row.floors == null ? null : Number(row.floors),
+      sapScore: row.sap_score == null ? null : Number(row.sap_score),
+      energyLabel: row.energy_label ?? null,
+      modelEnrichments: row.model_enrichments && typeof row.model_enrichments === 'object' ? row.model_enrichments : {},
       landUseClass: row.land_use_class,
       category: row.category,
       distanceMeters: row.distance_m == null ? null : Number(row.distance_m),
@@ -436,6 +940,7 @@ function rowToSelectionObject(row = {}) {
     entityType: row.entity_type || '',
     label: row.label || row.object_id || '',
     geometryType: row.geometry_type || null,
+    geometrySnapshot: parseMaybeJson(row.geometry_snapshot, null),
     clauseId: row.clause_id || null,
     clauseLabel: row.clause_label || null,
     distanceMeters: row.distance_m == null ? null : Number(row.distance_m),
@@ -451,6 +956,185 @@ function rowToSelectionObject(row = {}) {
 
 export function getTwinQueryContract() {
   return twinQueryContract()
+}
+
+async function getCityReadOnlySqlMvtTile(pool, cityId, query, tileOptions, normalized) {
+  try {
+    const sqlText = normalizePostgisSqlText(query.sqlText)
+    if (!sqlText) {
+      throw new Error('POSTGIS_SQL_SELECT_REQUIRED')
+    }
+
+    const result = await pool.query(
+      `
+        WITH city_sql AS MATERIALIZED (
+          ${sqlText}
+        ),
+        bounds AS (
+          SELECT
+            ST_TileEnvelope($2::int, $3::int, $4::int) AS geom_3857,
+            ST_Transform(ST_TileEnvelope($2::int, $3::int, $4::int), 4326) AS geom_4326
+        ),
+        city_filtered AS (
+          SELECT *
+          FROM city_sql
+          WHERE city_id = $1
+            AND geom IS NOT NULL
+            AND NOT ST_IsEmpty(geom)
+        ),
+        query_bounds AS (
+          SELECT ST_Extent(geom) AS extent
+          FROM city_filtered
+        ),
+        row_properties AS (
+          SELECT to_jsonb(city_filtered) AS properties
+          FROM city_filtered
+        ),
+        tile_rows AS (
+          SELECT
+            city_filtered.*,
+            to_jsonb(city_filtered) AS properties,
+            row_number() OVER () AS city_sql_row_index
+          FROM city_filtered
+          CROSS JOIN bounds
+          WHERE geom && bounds.geom_4326
+            AND ST_Intersects(geom, bounds.geom_4326)
+          LIMIT $5
+        ),
+        mvt_features AS (
+          SELECT
+            ST_AsMVTGeom(ST_Transform(tile_rows.geom, 3857), bounds.geom_3857, 4096, 64, true) AS geom,
+            COALESCE(
+              properties->>'object_id',
+              properties->>'objectId',
+              properties->>'stable_id',
+              properties->>'stableId',
+              properties->>'id',
+              'city-sql-row-' || city_sql_row_index::text
+            ) AS "objectId",
+            COALESCE(
+              properties->>'stable_id',
+              properties->>'stableId',
+              properties->>'object_id',
+              properties->>'objectId',
+              properties->>'id',
+              'city-sql-row-' || city_sql_row_index::text
+            ) AS "stableId",
+            COALESCE(properties->>'entity_type', properties->>'entityType') AS "entityType",
+            COALESCE(
+              properties->>'display_layer_key',
+              properties->>'layer_key',
+              properties->>'layerKey',
+              properties->>'semantic_class',
+              properties->>'semanticClass',
+              'features'
+            ) AS "layerKey",
+            COALESCE(
+              properties->>'display_layer_key',
+              properties->>'layer_key',
+              properties->>'layerKey',
+              properties->>'semantic_class',
+              properties->>'semanticClass',
+              'features'
+            ) AS "queryLayerKey",
+            COALESCE(properties->>'semantic_class', properties->>'semanticClass', 'features') AS "semanticClass",
+            COALESCE(properties->>'label', properties->>'name', properties->>'object_id', properties->>'objectId') AS label,
+            properties->>'authority_status' AS "authorityStatus",
+            properties->>'confidence' AS confidence,
+            properties->>'source_coverage_status' AS "sourceCoverageStatus",
+            properties->>'provider' AS provider,
+            properties->>'road_class' AS "roadClass",
+            properties->>'building_type' AS "buildingType",
+            properties->>'height_m' AS "heightMeters",
+            properties->>'floors' AS floors,
+            properties->>'sap_score' AS "sapScore",
+            properties->>'energy_label' AS "energyLabel",
+            properties->>'land_use_class' AS "landUseClass",
+            properties->>'category' AS category
+          FROM tile_rows
+          CROSS JOIN bounds
+        ),
+        counts_by_class AS (
+          SELECT COALESCE(properties->>'semantic_class', properties->>'semanticClass', 'features') AS semantic_class, count(*)::int AS feature_count
+          FROM row_properties
+          GROUP BY COALESCE(properties->>'semantic_class', properties->>'semanticClass', 'features')
+        ),
+        counts_by_layer AS (
+          SELECT COALESCE(properties->>'display_layer_key', properties->>'layer_key', properties->>'layerKey', properties->>'semantic_class', 'features') AS display_layer_key, count(*)::int AS feature_count
+          FROM row_properties
+          GROUP BY COALESCE(properties->>'display_layer_key', properties->>'layer_key', properties->>'layerKey', properties->>'semantic_class', 'features')
+        )
+        SELECT
+          COALESCE((SELECT ST_AsMVT(mvt_features, 'features', 4096, 'geom') FROM mvt_features), ''::bytea) AS tile,
+          (SELECT count(*)::int FROM city_filtered) AS tile_feature_count,
+          COALESCE(
+            (SELECT jsonb_object_agg(semantic_class, feature_count) FROM counts_by_class),
+            '{}'::jsonb
+          ) AS counts_by_semantic_class,
+          COALESCE(
+            (SELECT jsonb_object_agg(display_layer_key, feature_count) FROM counts_by_layer),
+            '{}'::jsonb
+          ) AS counts_by_layer,
+          (
+            SELECT CASE
+              WHEN extent IS NULL THEN NULL
+              ELSE ST_AsGeoJSON(ST_SetSRID(extent::geometry, 4326))::jsonb
+            END
+            FROM query_bounds
+          ) AS bounds_geometry,
+          '{}'::jsonb AS counts_by_clause
+      `,
+      [cityId, tileOptions.z, tileOptions.x, tileOptions.y, tileOptions.limit],
+    )
+
+    const row = result.rows[0] ?? {}
+    const tile = Buffer.isBuffer(row.tile) ? row.tile : Buffer.from(row.tile ?? '')
+    const tileFeatureCount = Number(row.tile_feature_count ?? 0)
+
+    return {
+      configured: true,
+      ok: true,
+      cityId,
+      query: normalized,
+      tile,
+      byteLength: tile.byteLength,
+      summary: {
+        tileFeatureCount,
+        tileLimit: tileOptions.limit,
+        truncatedTile: tileFeatureCount > tileOptions.limit,
+        z: tileOptions.z,
+        x: tileOptions.x,
+        y: tileOptions.y,
+        countsBySemanticClass: row.counts_by_semantic_class ?? {},
+        countsByLayer: row.counts_by_layer ?? {},
+        countsByClause: row.counts_by_clause ?? {},
+        bounds: boundsFromGeometry(row.bounds_geometry),
+      },
+      error: null,
+    }
+  } catch (error) {
+    const message = citySqlRequiresCityIdError(error)
+      ? 'POSTGIS_SQL_SELECT_REQUIRES_CITY_ID'
+      : citySqlMissingGeomError(error)
+        ? 'POSTGIS_SQL_SELECT_MVT_REQUIRES_GEOM'
+        : String(error?.message ?? 'POSTGIS_SQL_SELECT_MVT_UNAVAILABLE')
+    return {
+      configured: true,
+      ok: false,
+      cityId,
+      query: normalized,
+      tile: Buffer.alloc(0),
+      byteLength: 0,
+      summary: {
+        tileFeatureCount: 0,
+        tileLimit: tileOptions.limit,
+        z: tileOptions.z,
+        x: tileOptions.x,
+        y: tileOptions.y,
+      },
+      error: message,
+    }
+  }
 }
 
 export async function getTwinQueryMvtTile(cityId, input = {}) {
@@ -478,6 +1162,10 @@ export async function getTwinQueryMvtTile(cityId, input = {}) {
       },
       error: null,
     }
+  }
+
+  if (query.sqlMode === 'select' && query.sqlText) {
+    return getCityReadOnlySqlMvtTile(pool, cityId, query, tileOptions, normalized)
   }
 
   const values = []
@@ -508,7 +1196,10 @@ export async function getTwinQueryMvtTile(cityId, input = {}) {
         const clauseCenterLonParam = addParam(clause.scope.center?.[0] ?? null)
         const clauseCenterLatParam = addParam(clause.scope.center?.[1] ?? null)
         const scopeSql = scopeCteSql(clause.scope, addParam)
-        const whereSql = compileTwinQueryWhere(clause.where, addParam)
+        const whereSql = [
+          compileTwinQueryWhere(clause.where, addParam),
+          compilePostgisSqlWhere(clause.sqlWhere ?? query.sqlWhere),
+        ].filter(Boolean).join('\n')
 
         return {
           scopeName,
@@ -534,7 +1225,7 @@ export async function getTwinQueryMvtTile(cityId, input = {}) {
                   )
                   ELSE NULL
                 END AS distance_m
-              FROM ldt_query.city_objects co
+              FROM ldt_query.city_objects_enriched co
               CROSS JOIN bounds tb
               CROSS JOIN ${scopeName} qs
               WHERE co.city_id = ${cityParam}
@@ -592,7 +1283,10 @@ export async function getTwinQueryMvtTile(cityId, input = {}) {
       const centerLonParam = addParam(query.scope.center?.[0] ?? null)
       const centerLatParam = addParam(query.scope.center?.[1] ?? null)
       const scopeSql = scopeCteSql(query.scope, addParam)
-      const whereSql = compileTwinQueryWhere(query.where, addParam)
+      const whereSql = [
+        compileTwinQueryWhere(query.where, addParam),
+        compilePostgisSqlWhere(query.sqlWhere),
+      ].filter(Boolean).join('\n')
 
       filteredSql = `
         query_scope AS (
@@ -615,7 +1309,7 @@ export async function getTwinQueryMvtTile(cityId, input = {}) {
               )
               ELSE NULL
             END AS distance_m
-          FROM ldt_query.city_objects co
+          FROM ldt_query.city_objects_enriched co
           CROSS JOIN bounds tb
           CROSS JOIN query_scope qs
           WHERE co.city_id = ${cityParam}
@@ -639,9 +1333,13 @@ export async function getTwinQueryMvtTile(cityId, input = {}) {
       `
         WITH latest_boundary AS (
           SELECT geom
-          FROM city_boundaries
+          FROM ldt_core.city_boundaries
           WHERE city_id = ${cityParam}
-          ORDER BY created_at DESC
+            AND lower(COALESCE(boundary_role, '')) NOT LIKE '%test%'
+            AND lower(COALESCE(properties->>'source', '')) NOT LIKE '%smoke%'
+          ORDER BY CASE boundary_role WHEN 'municipality' THEN 0 WHEN 'administrative' THEN 1 ELSE 2 END,
+            created_at DESC,
+            id DESC
           LIMIT 1
         ),
         bounds AS (
@@ -687,6 +1385,8 @@ export async function getTwinQueryMvtTile(cityId, input = {}) {
             tile_rows.building_type AS "buildingType",
             tile_rows.height_m AS "heightMeters",
             tile_rows.floors AS floors,
+            tile_rows.sap_score AS "sapScore",
+            tile_rows.energy_label AS "energyLabel",
             tile_rows.land_use_class AS "landUseClass",
             tile_rows.category AS category,
             tile_rows.distance_m AS "distanceMeters",
@@ -779,7 +1479,7 @@ export async function getTwinQueryMvtTile(cityId, input = {}) {
   }
 }
 
-async function runCityTwinQueryClauses(pool, cityId, input, query, surface, intent, startedAt) {
+async function runCityTwinQueryClauses(pool, cityId, input, query, surface, intent, startedAt, visualPolicy = null) {
   const values = []
   const addParam = (value) => {
     values.push(value)
@@ -788,7 +1488,11 @@ async function runCityTwinQueryClauses(pool, cityId, input, query, surface, inte
 
   try {
     const cityParam = addParam(cityId)
-    const limit = query.render.mode === 'count' ? 0 : Math.min(MAX_TWIN_QUERY_LIMIT, query.render.maxFeatures)
+    const transport = String(query.render?.transport ?? '').trim()
+    const geojsonPolicy = geojsonTransportPolicy(query)
+    const needsFeaturePayload = twinQueryNeedsFeaturePayload(query)
+    const requestedFeatureLimit = geojsonPolicy.active ? geojsonPolicy.effectiveMaxFeatures : query.render.maxFeatures
+    const limit = needsFeaturePayload ? Math.min(MAX_TWIN_QUERY_LIMIT, requestedFeatureLimit) : 0
     const queryLimit = limit <= 0 ? 0 : Math.min(MAX_TWIN_QUERY_LIMIT + 1, limit + 1)
     const limitParam = addParam(queryLimit)
     const layerPriorityCase = layerPriorityCaseSql()
@@ -803,7 +1507,10 @@ async function runCityTwinQueryClauses(pool, cityId, input, query, surface, inte
       const clauseCenterLonParam = addParam(clause.scope.center?.[0] ?? null)
       const clauseCenterLatParam = addParam(clause.scope.center?.[1] ?? null)
       const scopeSql = scopeCteSql(clause.scope, addParam)
-      const whereSql = compileTwinQueryWhere(clause.where, addParam)
+      const whereSql = [
+        compileTwinQueryWhere(clause.where, addParam),
+        compilePostgisSqlWhere(clause.sqlWhere ?? query.sqlWhere),
+      ].filter(Boolean).join('\n')
 
       return {
         scopeName,
@@ -829,7 +1536,7 @@ async function runCityTwinQueryClauses(pool, cityId, input, query, surface, inte
                 )
                 ELSE NULL
               END AS distance_m
-            FROM ldt_query.city_objects co
+            FROM ldt_query.city_objects_enriched co
             CROSS JOIN ${scopeName} qs
             WHERE co.city_id = ${cityParam}
               AND (qs.geom IS NULL OR (co.geom && qs.geom AND ST_Intersects(co.geom, qs.geom)))
@@ -844,9 +1551,13 @@ async function runCityTwinQueryClauses(pool, cityId, input, query, surface, inte
       `
         WITH latest_boundary AS (
           SELECT geom
-          FROM city_boundaries
+          FROM ldt_core.city_boundaries
           WHERE city_id = ${cityParam}
-          ORDER BY created_at DESC
+            AND lower(COALESCE(boundary_role, '')) NOT LIKE '%test%'
+            AND lower(COALESCE(properties->>'source', '')) NOT LIKE '%smoke%'
+          ORDER BY CASE boundary_role WHEN 'municipality' THEN 0 WHEN 'administrative' THEN 1 ELSE 2 END,
+            created_at DESC,
+            id DESC
           LIMIT 1
         ),
         ${clauseSql.map((clause) => clause.sql).join(',\n')},
@@ -941,6 +1652,9 @@ async function runCityTwinQueryClauses(pool, cityId, input, query, surface, inte
                 'building_type', building_type,
                 'height_m', height_m,
                 'floors', floors,
+                'sap_score', sap_score,
+                'energy_label', energy_label,
+                'model_enrichments', model_enrichments,
                 'land_use_class', land_use_class,
                 'category', category,
                 'distance_m', distance_m,
@@ -961,11 +1675,32 @@ async function runCityTwinQueryClauses(pool, cityId, input, query, surface, inte
     const row = result.rows[0] ?? {}
     const totalCount = Number(row.total_count ?? 0)
     const rawRows = Array.isArray(row.rows) ? row.rows : []
-    const rows = rawRows.slice(0, limit)
+    const rows = needsFeaturePayload ? rawRows.slice(0, limit) : []
     const features = rows.map(rowToFeature).filter((feature) => feature.geometry)
-    const truncated = query.render.mode !== 'count' && totalCount > features.length && limit < totalCount
+    const truncated = needsFeaturePayload && totalCount > features.length && limit < totalCount
+    const transportPolicy =
+      geojsonTransportPolicySummary(geojsonPolicy, totalCount, features.length, truncated) ||
+      selectionReferenceTransportPolicySummary(query, totalCount) ||
+      directVisualTransportPolicySummary(visualPolicy, totalCount, features.length, truncated)
     const latencyMs = Date.now() - startedAt
     const normalized = normalizedPayload(query, surface, intent)
+    const summary = {
+      resultCount: totalCount,
+      returned: features.length,
+      truncated,
+      countsBySemanticClass: row.counts_by_semantic_class ?? {},
+      countsByLayer: row.counts_by_layer ?? {},
+      countsByClause: row.counts_by_clause ?? {},
+      bounds: boundsFromGeometry(row.bounds_geometry),
+      ...(transportPolicy ? { transportPolicy } : {}),
+    }
+    const selectionReference = selectionReferenceForQuery({
+      cityId,
+      query,
+      summary,
+      surface,
+      intent,
+    })
 
     await recordTwinQueryEvent(pool, {
       cityId,
@@ -994,6 +1729,8 @@ async function runCityTwinQueryClauses(pool, cityId, input, query, surface, inte
       metadata: {
         ...(input.metadata ?? {}),
         operation: query.operation,
+        payloadMode: needsFeaturePayload ? 'features' : 'tiles-only',
+        ...(transportPolicy ? { transportPolicy } : {}),
       },
     })
 
@@ -1003,15 +1740,8 @@ async function runCityTwinQueryClauses(pool, cityId, input, query, surface, inte
       cityId,
       contract: getTwinQueryContract(),
       query: normalized,
-      summary: {
-        resultCount: totalCount,
-        returned: features.length,
-        truncated,
-        countsBySemanticClass: row.counts_by_semantic_class ?? {},
-        countsByLayer: row.counts_by_layer ?? {},
-        countsByClause: row.counts_by_clause ?? {},
-        bounds: boundsFromGeometry(row.bounds_geometry),
-      },
+      summary,
+      ...(selectionReference ? { selectionReference } : {}),
       geojson: {
         type: 'FeatureCollection',
         features,
@@ -1064,6 +1794,238 @@ async function runCityTwinQueryClauses(pool, cityId, input, query, surface, inte
   }
 }
 
+async function runCityReadOnlySqlQuery(pool, cityId, input, query, surface, intent, startedAt) {
+  const normalized = normalizedPayload(query, surface, intent)
+
+  try {
+    const limit = citySqlLimit(query)
+    const requestedTransport = String(query.render?.transport ?? '').trim()
+    if (requestedTransport === 'mvt') {
+      try {
+        const execution = await executeReadOnlyCitySqlGeometrySummary(pool, cityId, query)
+        const totalCount = Number(execution.totalCount ?? 0)
+        const latencyMs = Date.now() - startedAt
+        const summary = {
+          resultCount: totalCount,
+          returned: 0,
+          returnedFeatures: 0,
+          returnedRows: 0,
+          truncated: false,
+          countsBySemanticClass: execution.countsBySemanticClass,
+          countsByLayer: execution.countsByLayer,
+          countsByClause: {},
+          bounds: boundsFromGeometry(execution.boundsGeometry),
+          transportPolicy: {
+            transport: 'mvt',
+            mode: 'read-only-city-sql-tiles',
+            requestedMaxFeatures: limit,
+            effectiveMaxFeatures: limit,
+            returned: 0,
+            resultCount: totalCount,
+            truncated: false,
+            featurePayload: false,
+            note: 'Read-only city SQL exposed geom and is served to the map as MVT tiles.',
+          },
+        }
+
+        await recordTwinQueryEvent(pool, {
+          cityId,
+          surface,
+          queryKind: query.language,
+          intent,
+          query: normalized,
+          scope: query.scope,
+          classes: query.classes,
+          filters: [{ sqlMode: 'select', sqlText: query.sqlText }],
+          render: query.render,
+          resultCount: totalCount,
+          truncated: false,
+          status: 'completed',
+          actorUserId: input.actorUserId ?? null,
+          actorRole: input.actorRole ?? null,
+          consumerKey: input.consumerKey ?? null,
+          shareKey: input.shareKey ?? null,
+          embedKey: input.embedKey ?? null,
+          requestPath: input.requestPath ?? null,
+          requestId: input.requestId ?? null,
+          latencyMs,
+          metadata: {
+            ...(input.metadata ?? {}),
+            operation: query.operation,
+            sqlMode: 'select',
+            payloadMode: 'mvt',
+            transportPolicy: summary.transportPolicy,
+          },
+        })
+
+        return {
+          configured: true,
+          ok: true,
+          cityId,
+          contract: getTwinQueryContract(),
+          query: normalized,
+          summary,
+          geojson: { type: 'FeatureCollection', features: [] },
+          transport: 'mvt',
+          error: null,
+        }
+      } catch (error) {
+        if (String(error?.message ?? '') !== 'POSTGIS_SQL_SELECT_REQUIRES_GEOM') {
+          throw error
+        }
+      }
+    }
+
+    const execution = await executeReadOnlyCitySql(pool, cityId, query, limit)
+    const features = execution.rows.map(citySqlRowToFeature).filter((feature) => feature?.geometry)
+    const tableRows = execution.rows.map(citySqlTableRow)
+    const counts = citySqlLimitedCounts(execution.rows)
+    const totalCount = Number(execution.totalCount ?? 0)
+    const returned = features.length || tableRows.length
+    const truncated = Boolean(execution.truncated || totalCount > execution.rows.length)
+    const latencyMs = Date.now() - startedAt
+    const transport = features.length ? 'geojson' : 'table'
+    const summary = {
+      resultCount: totalCount,
+      returned,
+      returnedFeatures: features.length,
+      returnedRows: tableRows.length,
+      truncated,
+      countsBySemanticClass: counts.countsBySemanticClass,
+      countsByLayer: counts.countsByLayer,
+      countsByClause: {},
+      bounds: boundsFromGeometry(execution.boundsGeometry),
+      transportPolicy: {
+        transport,
+        mode: 'read-only-city-sql',
+        requestedMaxFeatures: limit,
+        effectiveMaxFeatures: limit,
+        returned,
+        resultCount: totalCount,
+        truncated,
+        featurePayload: features.length > 0,
+        note: features.length
+          ? 'Read-only city SQL returned map features from the selected geom column.'
+          : 'Read-only city SQL returned tabular rows because the SELECT did not expose a geom column.',
+      },
+    }
+
+    await recordTwinQueryEvent(pool, {
+      cityId,
+      surface,
+      queryKind: query.language,
+      intent,
+      query: normalized,
+      scope: query.scope,
+      classes: query.classes,
+      filters: [{ sqlMode: 'select', sqlText: query.sqlText }],
+      render: query.render,
+      resultCount: totalCount,
+      truncated,
+      status: 'completed',
+      actorUserId: input.actorUserId ?? null,
+      actorRole: input.actorRole ?? null,
+      consumerKey: input.consumerKey ?? null,
+      shareKey: input.shareKey ?? null,
+      embedKey: input.embedKey ?? null,
+      requestPath: input.requestPath ?? null,
+      requestId: input.requestId ?? null,
+      latencyMs,
+      metadata: {
+        ...(input.metadata ?? {}),
+        operation: query.operation,
+        sqlMode: 'select',
+        payloadMode: features.length ? 'features' : 'table',
+        transportPolicy: summary.transportPolicy,
+      },
+    })
+
+    return {
+      configured: true,
+      ok: true,
+      cityId,
+      contract: getTwinQueryContract(),
+      query: normalized,
+      summary,
+      geojson: {
+        type: 'FeatureCollection',
+        features,
+      },
+      table: {
+        columns: citySqlTableColumns(execution.rows),
+        rows: tableRows,
+      },
+      transport,
+      error: null,
+    }
+  } catch (error) {
+    const latencyMs = Date.now() - startedAt
+    await recordTwinQueryEvent(pool, {
+      cityId,
+      surface,
+      queryKind: query.language,
+      intent,
+      query: normalized,
+      scope: query.scope,
+      classes: query.classes,
+      filters: [{ sqlMode: 'select', sqlText: query.sqlText }],
+      render: query.render,
+      resultCount: 0,
+      truncated: false,
+      status: 'failed',
+      actorUserId: input.actorUserId ?? null,
+      actorRole: input.actorRole ?? null,
+      consumerKey: input.consumerKey ?? null,
+      shareKey: input.shareKey ?? null,
+      embedKey: input.embedKey ?? null,
+      requestPath: input.requestPath ?? null,
+      requestId: input.requestId ?? null,
+      latencyMs,
+      metadata: {
+        ...(input.metadata ?? {}),
+        operation: query.operation,
+        sqlMode: 'select',
+        error: String(error?.message ?? 'UNKNOWN_CITY_SQL_ERROR'),
+      },
+    })
+
+    return {
+      configured: true,
+      ok: false,
+      cityId,
+      contract: getTwinQueryContract(),
+      query: normalized,
+      summary: emptyTwinQuerySummary(),
+      geojson: { type: 'FeatureCollection', features: [] },
+      table: { columns: [], rows: [] },
+      transport: 'table',
+      error: String(error?.message ?? 'UNKNOWN_CITY_SQL_ERROR'),
+    }
+  }
+}
+
+function citySqlRowToSelectionObject(row = {}, index = 0) {
+  const geometry = geometryFromCitySqlRow(row)
+  const objectId = objectIdFromCitySqlRow(row, index)
+  const geometryType = geometry?.type ? `ST_${geometry.type}` : null
+  return {
+    cityEntityId: row.city_entity_id || row.id || null,
+    objectId,
+    stableId: row.stable_id || row.stableId || objectId,
+    semanticClass: semanticClassFromCitySqlRow(row),
+    layerKey: layerKeyFromCitySqlRow(row),
+    entityType: row.entity_type || row.entityType || '',
+    label: row.label || row.name || objectId,
+    geometryType,
+    geometrySnapshot: geometry,
+    clauseId: row.clause_id || null,
+    clauseLabel: row.clause_label || null,
+    distanceMeters: row.distance_m == null ? null : Number(row.distance_m),
+    centroid: null,
+    attributes: citySqlTableRow(row),
+  }
+}
+
 export async function listCityTwinQueryObjectRows(cityId, input = {}, options = {}) {
   const pool = getProductionPool()
   const query = normalizeTwinQuery(input)
@@ -1084,6 +2046,43 @@ export async function listCityTwinQueryObjectRows(cityId, input = {}, options = 
     }
   }
 
+  if (query.sqlMode === 'select' && query.sqlText) {
+    try {
+      const execution = await executeReadOnlyCitySql(pool, cityId, query, rowLimit)
+      const rows = execution.rows.slice(0, rowLimit).map(citySqlRowToSelectionObject)
+      const counts = citySqlLimitedCounts(execution.rows)
+      const totalCount = Number(execution.totalCount ?? 0)
+      return {
+        configured: true,
+        ok: true,
+        cityId,
+        query: normalized,
+        rows,
+        summary: {
+          resultCount: totalCount,
+          returned: rows.length,
+          truncated: Boolean(execution.truncated || totalCount > rows.length),
+          rowLimit,
+          countsBySemanticClass: counts.countsBySemanticClass,
+          countsByLayer: counts.countsByLayer,
+          countsByClause: {},
+          bounds: boundsFromGeometry(execution.boundsGeometry),
+        },
+        error: null,
+      }
+    } catch (error) {
+      return {
+        configured: true,
+        ok: false,
+        cityId,
+        query: normalized,
+        rows: [],
+        summary: emptyTwinQuerySummary({ rowLimit }),
+        error: String(error?.message ?? 'TWIN_QUERY_SELECTION_ROWS_UNAVAILABLE'),
+      }
+    }
+  }
+
   const values = []
   const addParam = (value) => {
     values.push(value)
@@ -1099,6 +2098,7 @@ export async function listCityTwinQueryObjectRows(cityId, input = {}, options = 
       'semantic_class', semantic_class,
       'label', label,
       'geometry_type', ST_GeometryType(display_geom),
+      'geometry_snapshot', ST_AsGeoJSON(display_geom)::jsonb,
       'clause_id', clause_id,
       'clause_label', clause_label,
       'distance_m', distance_m,
@@ -1115,6 +2115,9 @@ export async function listCityTwinQueryObjectRows(cityId, input = {}, options = 
         'buildingType', building_type,
         'heightMeters', height_m,
         'floors', floors,
+        'sapScore', sap_score,
+        'energyLabel', energy_label,
+        'modelEnrichments', model_enrichments,
         'landUseClass', land_use_class,
         'category', category,
         'placeType', place_type,
@@ -1150,7 +2153,10 @@ export async function listCityTwinQueryObjectRows(cityId, input = {}, options = 
         const clauseCenterLonParam = addParam(clause.scope.center?.[0] ?? null)
         const clauseCenterLatParam = addParam(clause.scope.center?.[1] ?? null)
         const scopeSql = scopeCteSql(clause.scope, addParam)
-        const whereSql = compileTwinQueryWhere(clause.where, addParam)
+        const whereSql = [
+          compileTwinQueryWhere(clause.where, addParam),
+          compilePostgisSqlWhere(clause.sqlWhere ?? query.sqlWhere),
+        ].filter(Boolean).join('\n')
 
         return {
           filteredName,
@@ -1175,7 +2181,7 @@ export async function listCityTwinQueryObjectRows(cityId, input = {}, options = 
                   )
                   ELSE NULL
                 END AS distance_m
-              FROM ldt_query.city_objects co
+              FROM ldt_query.city_objects_enriched co
               CROSS JOIN ${scopeName} qs
               WHERE co.city_id = ${cityParam}
                 AND co.geom IS NOT NULL
@@ -1230,7 +2236,10 @@ export async function listCityTwinQueryObjectRows(cityId, input = {}, options = 
       const centerLonParam = addParam(query.scope.center?.[0] ?? null)
       const centerLatParam = addParam(query.scope.center?.[1] ?? null)
       const scopeSql = scopeCteSql(query.scope, addParam)
-      const whereSql = compileTwinQueryWhere(query.where, addParam)
+      const whereSql = [
+        compileTwinQueryWhere(query.where, addParam),
+        compilePostgisSqlWhere(query.sqlWhere),
+      ].filter(Boolean).join('\n')
 
       filteredSql = `
         query_scope AS (
@@ -1253,7 +2262,7 @@ export async function listCityTwinQueryObjectRows(cityId, input = {}, options = 
               )
               ELSE NULL
             END AS distance_m
-          FROM ldt_query.city_objects co
+          FROM ldt_query.city_objects_enriched co
           CROSS JOIN query_scope qs
           WHERE co.city_id = ${cityParam}
             AND co.geom IS NOT NULL
@@ -1274,9 +2283,13 @@ export async function listCityTwinQueryObjectRows(cityId, input = {}, options = 
       `
         WITH latest_boundary AS (
           SELECT geom
-          FROM city_boundaries
+          FROM ldt_core.city_boundaries
           WHERE city_id = ${cityParam}
-          ORDER BY created_at DESC
+            AND lower(COALESCE(boundary_role, '')) NOT LIKE '%test%'
+            AND lower(COALESCE(properties->>'source', '')) NOT LIKE '%smoke%'
+          ORDER BY CASE boundary_role WHEN 'municipality' THEN 0 WHEN 'administrative' THEN 1 ELSE 2 END,
+            created_at DESC,
+            id DESC
           LIMIT 1
         ),
         ${filteredSql},
@@ -1373,9 +2386,14 @@ export async function listCityTwinQueryObjectRows(cityId, input = {}, options = 
 
 export async function runCityTwinQuery(cityId, input = {}) {
   const pool = getProductionPool()
-  const query = normalizeTwinQuery(input)
+  const rawQuery = normalizeTwinQuery(input)
   const surface = normalizeSurface(input.surface ?? input.query?.surface)
   const intent = normalizeIntent(input.intent ?? input.query?.intent)
+  const visualPlan = planTwinQueryVisualTransport(rawQuery, {
+    intent,
+    metadata: input.metadata && typeof input.metadata === 'object' ? input.metadata : {},
+  })
+  const query = visualPlan.query
   const startedAt = Date.now()
 
   if (!pool) {
@@ -1391,7 +2409,11 @@ export async function runCityTwinQuery(cityId, input = {}) {
   }
 
   if (Array.isArray(query.clauses) && query.clauses.length) {
-    return runCityTwinQueryClauses(pool, cityId, input, query, surface, intent, startedAt)
+    return runCityTwinQueryClauses(pool, cityId, input, query, surface, intent, startedAt, visualPlan.policy)
+  }
+
+  if (query.sqlMode === 'select' && query.sqlText) {
+    return runCityReadOnlySqlQuery(pool, cityId, input, query, surface, intent, startedAt)
   }
 
   const values = []
@@ -1404,20 +2426,31 @@ export async function runCityTwinQuery(cityId, input = {}) {
     const cityParam = addParam(cityId)
     const classParam = addParam(query.classes)
     const scopeKeyParam = addParam(query.scope.key)
-    const limit = query.render.mode === 'count' ? 0 : Math.min(MAX_TWIN_QUERY_LIMIT, query.render.maxFeatures)
-  const queryLimit = limit <= 0 ? 0 : Math.min(MAX_TWIN_QUERY_LIMIT + 1, limit + 1)
+    const transport = String(query.render?.transport ?? '').trim()
+    const geojsonPolicy = geojsonTransportPolicy(query)
+    const needsFeaturePayload = twinQueryNeedsFeaturePayload(query)
+    const requestedFeatureLimit = geojsonPolicy.active ? geojsonPolicy.effectiveMaxFeatures : query.render.maxFeatures
+    const limit = needsFeaturePayload ? Math.min(MAX_TWIN_QUERY_LIMIT, requestedFeatureLimit) : 0
+    const queryLimit = limit <= 0 ? 0 : Math.min(MAX_TWIN_QUERY_LIMIT + 1, limit + 1)
     const limitParam = addParam(queryLimit)
     const scopeSql = scopeCteSql(query.scope, addParam)
-    const whereSql = compileTwinQueryWhere(query.where, addParam)
+    const whereSql = [
+      compileTwinQueryWhere(query.where, addParam),
+      compilePostgisSqlWhere(query.sqlWhere),
+    ].filter(Boolean).join('\n')
     const layerPriorityCase = layerPriorityCaseSql()
 
     const result = await pool.query(
       `
         WITH latest_boundary AS (
           SELECT geom
-          FROM city_boundaries
+          FROM ldt_core.city_boundaries
           WHERE city_id = ${cityParam}
-          ORDER BY created_at DESC
+            AND lower(COALESCE(boundary_role, '')) NOT LIKE '%test%'
+            AND lower(COALESCE(properties->>'source', '')) NOT LIKE '%smoke%'
+          ORDER BY CASE boundary_role WHEN 'municipality' THEN 0 WHEN 'administrative' THEN 1 ELSE 2 END,
+            created_at DESC,
+            id DESC
           LIMIT 1
         ),
         query_scope AS (
@@ -1437,7 +2470,7 @@ export async function runCityTwinQuery(cityId, input = {}) {
               )
               ELSE NULL
             END AS distance_m
-          FROM ldt_query.city_objects co
+          FROM ldt_query.city_objects_enriched co
           CROSS JOIN query_scope qs
           WHERE co.city_id = ${cityParam}
             AND (qs.geom IS NULL OR (co.geom && qs.geom AND ST_Intersects(co.geom, qs.geom)))
@@ -1511,6 +2544,9 @@ export async function runCityTwinQuery(cityId, input = {}) {
                 'building_type', building_type,
                 'height_m', height_m,
                 'floors', floors,
+                'sap_score', sap_score,
+                'energy_label', energy_label,
+                'model_enrichments', model_enrichments,
                 'land_use_class', land_use_class,
                 'category', category,
                 'distance_m', distance_m,
@@ -1529,11 +2565,32 @@ export async function runCityTwinQuery(cityId, input = {}) {
     const row = result.rows[0] ?? {}
     const totalCount = Number(row.total_count ?? 0)
     const rawRows = Array.isArray(row.rows) ? row.rows : []
-    const rows = rawRows.slice(0, limit)
+    const rows = needsFeaturePayload ? rawRows.slice(0, limit) : []
     const features = rows.map(rowToFeature).filter((feature) => feature.geometry)
-    const truncated = query.render.mode !== 'count' && totalCount > features.length && limit < totalCount
+    const truncated = needsFeaturePayload && totalCount > features.length && limit < totalCount
+    const transportPolicy =
+      geojsonTransportPolicySummary(geojsonPolicy, totalCount, features.length, truncated) ||
+      selectionReferenceTransportPolicySummary(query, totalCount) ||
+      directVisualTransportPolicySummary(visualPlan.policy, totalCount, features.length, truncated)
     const latencyMs = Date.now() - startedAt
     const normalized = normalizedPayload(query, surface, intent)
+    const summary = {
+      resultCount: totalCount,
+      returned: features.length,
+      truncated,
+      countsBySemanticClass: row.counts_by_semantic_class ?? {},
+      countsByLayer: row.counts_by_layer ?? {},
+      countsByClause: {},
+      bounds: boundsFromGeometry(row.bounds_geometry),
+      ...(transportPolicy ? { transportPolicy } : {}),
+    }
+    const selectionReference = selectionReferenceForQuery({
+      cityId,
+      query,
+      summary,
+      surface,
+      intent,
+    })
 
     await recordTwinQueryEvent(pool, {
       cityId,
@@ -1556,7 +2613,11 @@ export async function runCityTwinQuery(cityId, input = {}) {
       requestPath: input.requestPath ?? null,
       requestId: input.requestId ?? null,
       latencyMs,
-      metadata: input.metadata ?? {},
+      metadata: {
+        ...(input.metadata ?? {}),
+        payloadMode: needsFeaturePayload ? 'features' : 'tiles-only',
+        ...(transportPolicy ? { transportPolicy } : {}),
+      },
     })
 
     return {
@@ -1565,15 +2626,8 @@ export async function runCityTwinQuery(cityId, input = {}) {
       cityId,
       contract: getTwinQueryContract(),
       query: normalized,
-      summary: {
-        resultCount: totalCount,
-        returned: features.length,
-        truncated,
-        countsBySemanticClass: row.counts_by_semantic_class ?? {},
-        countsByLayer: row.counts_by_layer ?? {},
-        countsByClause: {},
-        bounds: boundsFromGeometry(row.bounds_geometry),
-      },
+      summary,
+      ...(selectionReference ? { selectionReference } : {}),
       geojson: {
         type: 'FeatureCollection',
         features,

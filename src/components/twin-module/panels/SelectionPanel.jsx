@@ -2,6 +2,46 @@
 
 import { Box, Layers, MapPin, Target } from 'react-feather'
 
+function numericDisplay(value) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return String(value ?? 'n/a')
+  return numeric.toFixed(2)
+}
+
+function modelEnrichmentRows(properties = {}) {
+  const rows = []
+  const enrichments = properties.modelEnrichments || properties.model_enrichments || {}
+  Object.entries(enrichments).forEach(([modelKey, outputs]) => {
+    Object.entries(outputs || {}).forEach(([outputKey, output]) => {
+      rows.push({
+        modelKey,
+        outputKey,
+        value: output?.valueNumeric ?? output?.valueText ?? output?.value?.value ?? output?.value ?? null,
+        confidence: output?.confidence || 'unknown',
+        authorityStatus: output?.authorityStatus || 'derived-model-output',
+        generatedAt: output?.generatedAt || '',
+      })
+    })
+  })
+  if (!rows.length && properties.sapScore != null) {
+    rows.push({
+      modelKey: 'eu-ldt-building-sap-xgboost',
+      outputKey: 'sap-score',
+      value: properties.sapScore,
+      confidence: properties.confidence || 'derived',
+      authorityStatus: properties.authorityStatus || 'derived-model-output',
+      generatedAt: '',
+    })
+  }
+  return rows
+}
+
+function confidenceLabel(confidence) {
+  if (confidence === 'smoke-synthetic') return 'Smoke-synthetic features'
+  if (confidence === 'external-platform-derived') return 'External platform derived'
+  return confidence
+}
+
 export default function SelectionPanel({ selection }) {
   if (!selection) {
     return (
@@ -11,6 +51,7 @@ export default function SelectionPanel({ selection }) {
       </div>
     )
   }
+  const modelRows = modelEnrichmentRows(selection.properties)
 
   return (
     <div className="dt-side-note">
@@ -65,6 +106,25 @@ export default function SelectionPanel({ selection }) {
               </span>
             ) : null}
           </div>
+        </div>
+      ) : null}
+      {modelRows.length ? (
+        <div className="dt-building-record dt-building-record--model">
+          <strong>Model enrichments</strong>
+          {modelRows.map((row) => (
+            <div className="dt-model-enrichment-row" key={`${row.modelKey}:${row.outputKey}`}>
+              <div>
+                <span>{row.outputKey}</span>
+                <strong>{numericDisplay(row.value)}</strong>
+              </div>
+              <p>{row.modelKey}</p>
+              <div className="dt-selection-chips">
+                <span className="dt-selection-chip">{row.authorityStatus === 'derived-model-output' ? 'Derived model output' : row.authorityStatus}</span>
+                <span className="dt-selection-chip">{confidenceLabel(row.confidence)}</span>
+                <span className="dt-selection-chip">Not authority approved</span>
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
     </div>

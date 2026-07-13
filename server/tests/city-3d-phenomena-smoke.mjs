@@ -91,7 +91,7 @@ async function sceneDataset(frame) {
 const baseUrl = (argValue('base-url') || process.env.TWIN_STUDIO_SMOKE_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '')
 const email = argValue('email') || process.env.TWIN_STUDIO_SMOKE_EMAIL
 const password = argValue('password') || process.env.TWIN_STUDIO_SMOKE_PASSWORD
-const cityId = argValue('city') || process.env.TWIN_STUDIO_E2E_CITY_ID || 'kharkiv'
+const cityId = argValue('city') || process.env.TWIN_STUDIO_E2E_CITY_ID || 'guanajuato'
 
 assert(email, 'SMOKE_EMAIL_REQUIRED')
 assert(password, 'SMOKE_PASSWORD_REQUIRED')

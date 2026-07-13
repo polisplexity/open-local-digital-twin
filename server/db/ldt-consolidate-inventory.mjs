@@ -3,7 +3,7 @@ import { getProductionDatabaseUrl } from './migrate.mjs'
 
 const { Pool } = pg
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = []
 const CONSOLIDATED_SOURCE_LAYERS = [
   'roads',
   'buildings',

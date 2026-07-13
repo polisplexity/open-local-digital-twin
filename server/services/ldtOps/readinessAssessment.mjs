@@ -33,21 +33,21 @@ export function buildReadinessAssessment({ cityId, counts, entityCounts, sourceL
   const placeCount = Number(entityCounts.place ?? 0)
   const sourceLayerNames = Object.keys(sourceLayerCounts)
   const hasOverture = sourceLayerNames.some((name) => name.includes('overture'))
+  const hasBuildingSource = hasOverture || Number(sourceLayerCounts.buildings ?? 0) > 0
   const hasOsmLikeBase = sourceLayerNames.some((name) => ['buildings', 'roads', 'facilities', 'greenBlue', 'places'].includes(name))
   const roadToBuildingRatio = ratio(roadCount, buildingCount)
   const approvedOrQueuedRuns = recentWorkflowRuns.filter((run) => ['queued', 'running', 'succeeded'].includes(run.status)).length
   const checkRows = [
     readinessCheck({
-      key: 'single-city-demo-posture',
-      label: 'Single-city demo posture',
+      key: 'city-workspace-posture',
+      label: 'City workspace posture',
       category: 'product',
-      status: cityId === 'kharkiv' ? 'ready' : 'lab',
-      summary:
-        cityId === 'kharkiv'
-          ? 'Kharkiv is the active demo city for the current product path.'
-          : 'This city is preserved for lab, comparison, or reconstruction, not the active demo path.',
+      status: cityId ? 'ready' : 'blocked',
+      summary: cityId
+        ? `The current workspace is scoped to ${cityId}.`
+        : 'No active city is selected for this workspace.',
       evidence: { cityId },
-      action: cityId === 'kharkiv' ? null : 'Keep this city reconstructable, but optimize Phase 11 around Kharkiv.',
+      action: cityId ? null : 'Select or bootstrap an active city before presenting this workspace.',
     }),
     readinessCheck({
       key: 'source-coverage',
@@ -66,13 +66,14 @@ export function buildReadinessAssessment({ cityId, counts, entityCounts, sourceL
       key: 'building-inventory',
       label: 'Building inventory',
       category: 'inventory',
-      status: buildingCount > 0 && hasOverture ? 'ready' : buildingCount > 0 ? 'partial' : 'blocked',
+      status: buildingCount > 0 && hasBuildingSource ? 'ready' : buildingCount > 0 ? 'partial' : 'blocked',
       summary: `${buildingCount} consolidated building entities are available.`,
       evidence: {
         buildings: buildingCount,
-        overtureAvailable: hasOverture,
+        sourceBacked: hasBuildingSource,
+        sourceLayers: sourceLayerCounts,
       },
-      action: hasOverture ? null : 'Add open building enrichment such as Overture before making completeness claims.',
+      action: hasBuildingSource ? null : 'Attach a source-backed building layer before making completeness claims.',
     }),
     readinessCheck({
       key: 'road-network-coverage',
@@ -91,7 +92,7 @@ export function buildReadinessAssessment({ cityId, counts, entityCounts, sourceL
       key: 'service-and-place-anchors',
       label: 'Service and place anchors',
       category: 'inventory',
-      status: facilityCount > 0 && placeCount > 0 ? 'ready' : facilityCount > 0 ? 'partial' : 'blocked',
+      status: facilityCount > 0 && placeCount > 0 ? 'ready' : 'partial',
       summary: `${facilityCount} facilities and ${placeCount} places are available as city analyst anchors.`,
       evidence: {
         facilities: facilityCount,
@@ -103,12 +104,12 @@ export function buildReadinessAssessment({ cityId, counts, entityCounts, sourceL
       key: 'green-blue-coverage',
       label: 'Green-blue coverage',
       category: 'inventory',
-      status: greenBlueCount > 0 ? 'partial' : 'blocked',
-      summary: `${greenBlueCount} green-blue entities are available. Classification depth is now a Phase 14 source-backed workflow task.`,
+      status: greenBlueCount > 0 ? 'ready' : 'partial',
+      summary: `${greenBlueCount} green-blue entities are available. Classification depth is a source-backed enrichment task.`,
       evidence: {
         greenBlueSystems: greenBlueCount,
       },
-      action: 'Use Phase 14 open-data workflows and environmental extractors to classify parks, water, forest, reserves, and public realm before environmental claims.',
+      action: 'Use open-data workflows and environmental extractors to classify parks, water, forest, reserves, and public realm before environmental claims.',
     }),
     readinessCheck({
       key: 'standards-publication',
@@ -142,7 +143,7 @@ export function buildReadinessAssessment({ cityId, counts, entityCounts, sourceL
       label: 'Workflow readiness',
       category: 'operations',
       status: counts.workflowDefinitions >= 3 && counts.pendingWorkflowApprovals === 0 && approvedOrQueuedRuns > 0 ? 'ready' : 'partial',
-      summary: `${counts.workflowDefinitions} workflow definitions, ${counts.workflowRuns} runs, and ${counts.pendingWorkflowApprovals} pending approvals are recorded.`,
+      summary: `${counts.workflowDefinitions} active workflow definitions, ${counts.workflowRuns} runs, and ${counts.pendingWorkflowApprovals} pending approvals are recorded.`,
       evidence: {
         workflowDefinitions: counts.workflowDefinitions,
         workflowRuns: counts.workflowRuns,
@@ -167,7 +168,7 @@ export function buildReadinessAssessment({ cityId, counts, entityCounts, sourceL
       label: 'UI product surface',
       category: 'ui',
       status: 'ready',
-      summary: 'Workspace, Analytical Map, City 3D, and Civic XR are split and accepted as the Phase 13 Kharkiv visual baseline.',
+      summary: 'Workspace, Analytical Map, City 3D, and Civic XR are split and accepted as the current visual baseline.',
       evidence: {
         capabilitiesPage: true,
         workspaceStatus: 'implemented-baseline',

@@ -12,6 +12,21 @@ export const SidebarMenu = [
         badge: <HkBadge size="sm" bg="success" soft className="ms-auto">live</HkBadge>,
       },
       {
+        name: 'Workspace',
+        icon: <Icons.LayoutDashboard />,
+        path: '/workspace',
+      },
+      {
+        name: 'Operations',
+        icon: <Icons.Activity />,
+        path: '/operations',
+      },
+      {
+        name: 'Standards',
+        icon: <Icons.World />,
+        path: '/standards',
+      },
+      {
         name: 'Analytical Map',
         icon: <Icons.Map2 />,
         path: '/analytical-map',

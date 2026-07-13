@@ -1,4 +1,5 @@
 import { getProductionPool } from '../postgisPool.mjs'
+import { resolveRuntimeDataPath } from './runtimePathResolver.mjs'
 
 function requirePool() {
   const pool = getProductionPool()
@@ -27,9 +28,9 @@ function rowToTileset(row) {
     contentState: row.content_state,
     sourceQuery: parseJson(row.source_query, {}),
     semanticClasses: row.semantic_classes ?? [],
-    assetRoot: row.asset_root,
+    assetRoot: resolveRuntimeDataPath(row.asset_root),
     tilesetUrl: row.tileset_url,
-    tilesetPath: row.tileset_path,
+    tilesetPath: resolveRuntimeDataPath(row.tileset_path),
     featureCount: Number(row.feature_count ?? 0),
     objectCount: Number(row.object_count ?? 0),
     byteSize: Number(row.byte_size ?? 0),
@@ -132,4 +133,3 @@ export async function listCity3dTilesetRecords(cityId, options = {}) {
 
   return result.rows.map(rowToTileset)
 }
-

@@ -33,7 +33,7 @@ const LockScreen = () => {
                           <div className="text-uppercase fs-8 fw-semibold text-primary letter-spacing-3 mb-2">{brandName} / {getCityDisplayName(activeCity)}</div>
                           <h4 className="text-white">{workspaceName}</h4>
                           <p className="p-sm mb-2 text-white opacity-75">{getLoginTitle(activeCity)}</p>
-                          <p className="p-sm mb-4 text-white opacity-55">admin@example.org</p>
+                          <p className="p-sm mb-4 text-white opacity-55">user@example.org</p>
                           <Row className="gx-3">
                             <Col as={Form.Group} className="mb-3">
                               <Form.Control placeholder="Enter password" type="password" />

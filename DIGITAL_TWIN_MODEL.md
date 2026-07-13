@@ -276,7 +276,7 @@ This is consistent with the `WS2` direction:
 
 The current local reference for those requirements is:
 
-- `/home/hadox/cmd-center/orgs/polisplexity-ldt4ssc/workspace/open-call-2/official/text/ws2/cpmws2.pdf.txt`
+- `<official-call-materials>/cpmws2.pdf.txt`
 - see around lines `1445-1446`, `1616-1619`, `1634`, and `1711-1715`
 
 ## 9. Immediate UI Consequence

@@ -166,12 +166,25 @@ export function renderMapLibreSourceRuntime() {
               filter: ['==', '$type', 'Polygon'],
               paint: {
                 'fill-color': [
-                  'match',
-                  ['get', 'layerKey'],
-                  'buildings', '#0891b2',
-                  'greenBlue', '#0f766e',
-                  'unclassifiedLand', '#f59e0b',
-                  '#7c3aed',
+                  'case',
+                  ['has', 'sapScore'],
+                  [
+                    'interpolate',
+                    ['linear'],
+                    ['to-number', ['get', 'sapScore']],
+                    30, '#dc2626',
+                    55, '#f59e0b',
+                    75, '#16a34a',
+                    95, '#0f766e',
+                  ],
+                  [
+                    'match',
+                    ['get', 'layerKey'],
+                    'buildings', '#0891b2',
+                    'greenBlue', '#0f766e',
+                    'unclassifiedLand', '#f59e0b',
+                    '#7c3aed',
+                  ],
                 ],
                 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0.18, 13, 0.28, 17, 0.42],
               },
@@ -416,6 +429,321 @@ export function renderMapLibreSourceRuntime() {
           })
         }
 
+        function fragmentWorkspaceCollection(message = {}) {
+          if (message.combinedGeojson?.type === 'FeatureCollection') return message.combinedGeojson
+          return {
+            type: 'FeatureCollection',
+            features: (message.fragments || []).flatMap((fragment) => fragment.geojson?.features || []),
+          }
+        }
+
+        function fragmentWorkspaceTileTemplate(fragment = {}) {
+          return String(fragment.links?.vectorTileTemplate || fragment.vectorTileTemplate || '')
+        }
+
+        function fragmentWorkspaceTileFragments(message = {}) {
+          return (Array.isArray(message.fragments) ? message.fragments : [])
+            .filter((fragment) => fragmentWorkspaceTileTemplate(fragment))
+        }
+
+        function fragmentWorkspaceColorExpression(fragment = {}, colorBy = '__fragment') {
+          const fallback = fragment.color || '#007c89'
+          if (colorBy === 'semanticClass') {
+            return [
+              'match',
+              ['coalesce', ['get', 'semanticClass'], ['get', 'semantic_class'], ''],
+              'buildings', '#256f48',
+              'builtFabric', '#256f48',
+              'roads', '#007c89',
+              'mobilityNetwork', '#007c89',
+              'greenBlue', '#73a942',
+              'civicServices', '#355fc8',
+              'places', '#c57c17',
+              fallback,
+            ]
+          }
+          if (colorBy === 'layerKey') {
+            return [
+              'match',
+              ['coalesce', ['get', 'layerKey'], ['get', 'layer_key'], ['get', 'display_layer_key'], ''],
+              'buildings', '#256f48',
+              'roads', '#007c89',
+              'greenBlue', '#73a942',
+              'civic', '#355fc8',
+              'places', '#c57c17',
+              fallback,
+            ]
+          }
+          if (colorBy === 'energy_label') {
+            return [
+              'match',
+              ['coalesce', ['get', 'energy_label'], ['get', 'energyLabel'], ''],
+              'A', '#0f766e',
+              'B', '#16a34a',
+              'C', '#84cc16',
+              'D', '#eab308',
+              'E', '#f97316',
+              'F', '#dc2626',
+              'G', '#991b1b',
+              fallback,
+            ]
+          }
+          if (colorBy === 'roadClass') {
+            return [
+              'match',
+              ['coalesce', ['get', 'roadClass'], ['get', 'road_class'], ['get', 'highway'], ''],
+              'motorway', '#7c2d12',
+              'trunk', '#9a3412',
+              'primary', '#c2410c',
+              'secondary', '#0e7490',
+              'tertiary', '#0369a1',
+              'residential', '#256f48',
+              fallback,
+            ]
+          }
+          return fallback
+        }
+
+        function removeFragmentWorkspaceVectorSources() {
+          fragmentWorkspaceVectorLayerIds.forEach((id) => {
+            if (map.getLayer(id)) map.removeLayer(id)
+          })
+          fragmentWorkspaceVectorSourceIds.forEach((id) => {
+            if (map.getSource(id)) map.removeSource(id)
+          })
+          fragmentWorkspaceVectorLayerIds = []
+          fragmentWorkspaceVectorSourceIds = []
+        }
+
+        function removeFragmentWorkspaceGeojsonSource() {
+          fragmentWorkspaceLayerIds.forEach((id) => {
+            if (map.getLayer(id)) map.removeLayer(id)
+          })
+          if (map.getSource(fragmentWorkspaceSourceId)) map.removeSource(fragmentWorkspaceSourceId)
+        }
+
+        function installFragmentWorkspaceVectorSources(fragments = [], options = {}) {
+          if (!map || !mapReady) return 0
+          removeFragmentWorkspaceVectorSources()
+          const opacity = Math.min(1, Math.max(0.1, Number(options.opacity ?? 0.78)))
+          const colorBy = String(options.colorBy || '__fragment')
+          const polygonFilter = ['==', '$type', 'Polygon']
+          const lineFilter = ['==', '$type', 'LineString']
+          const pointFilter = ['==', '$type', 'Point']
+          let sourceCount = 0
+          fragments.forEach((fragment, index) => {
+            const tileTemplate = fragmentWorkspaceTileTemplate(fragment)
+            if (!tileTemplate) return
+            const sourceId = fragmentWorkspaceSourceId + '-mvt-' + String(index)
+            map.addSource(sourceId, {
+              type: 'vector',
+              tiles: [tileTemplate],
+              minzoom: 0,
+              maxzoom: 20,
+            })
+            fragmentWorkspaceVectorSourceIds.push(sourceId)
+            sourceCount += 1
+            const colorExpression = fragmentWorkspaceColorExpression(fragment, colorBy)
+            const fillId = sourceId + '-fill'
+            map.addLayer({
+              id: fillId,
+              type: 'fill',
+              source: sourceId,
+              'source-layer': sourceLayerName,
+              filter: polygonFilter,
+              paint: {
+                'fill-color': colorExpression,
+                'fill-opacity': ['interpolate', ['linear'], ['zoom'], 8, opacity * 0.2, 13, opacity * 0.46, 17, opacity * 0.68],
+              },
+            })
+            fragmentWorkspaceVectorLayerIds.push(fillId)
+            const outlineId = sourceId + '-outline'
+            map.addLayer({
+              id: outlineId,
+              type: 'line',
+              source: sourceId,
+              'source-layer': sourceLayerName,
+              filter: polygonFilter,
+              paint: {
+                'line-color': colorExpression,
+                'line-opacity': Math.min(1, opacity + 0.08),
+                'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.5, 13, 1.1, 17, 2.2],
+              },
+            })
+            fragmentWorkspaceVectorLayerIds.push(outlineId)
+            const lineId = sourceId + '-line'
+            map.addLayer({
+              id: lineId,
+              type: 'line',
+              source: sourceId,
+              'source-layer': sourceLayerName,
+              filter: lineFilter,
+              paint: {
+                'line-color': colorExpression,
+                'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.9, 12, 1.8, 16, 4.6],
+                'line-opacity': opacity,
+              },
+              layout: {
+                'line-cap': 'round',
+                'line-join': 'round',
+              },
+            })
+            fragmentWorkspaceVectorLayerIds.push(lineId)
+            const pointId = sourceId + '-points'
+            map.addLayer({
+              id: pointId,
+              type: 'circle',
+              source: sourceId,
+              'source-layer': sourceLayerName,
+              filter: pointFilter,
+              paint: {
+                'circle-color': colorExpression,
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 2, 13, 4, 17, 8],
+                'circle-opacity': opacity,
+                'circle-stroke-color': '#ffffff',
+                'circle-stroke-opacity': Math.min(1, opacity + 0.08),
+                'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 8, 0.4, 15, 1.2],
+              },
+            })
+            fragmentWorkspaceVectorLayerIds.push(pointId)
+          })
+          fragmentWorkspaceVectorLayerIds.forEach((id) => {
+            if (map.getLayer(id)) map.moveLayer(id)
+          })
+          return sourceCount
+        }
+
+        function setFragmentWorkspaceOpacity(opacity = 0.78) {
+          const safeOpacity = Math.min(1, Math.max(0.1, Number(opacity) || 0.78))
+          setPaintIfLayer('twin-fragment-fill', 'fill-opacity', ['interpolate', ['linear'], ['zoom'], 8, safeOpacity * 0.2, 13, safeOpacity * 0.46, 17, safeOpacity * 0.68])
+          setPaintIfLayer('twin-fragment-line', 'line-opacity', safeOpacity)
+          setPaintIfLayer('twin-fragment-points', 'circle-opacity', safeOpacity)
+          setPaintIfLayer('twin-fragment-points', 'circle-stroke-opacity', Math.min(1, safeOpacity + 0.08))
+        }
+
+        function ensureFragmentWorkspaceLayers(opacity = 0.78) {
+          if (!map || !mapReady) return
+          if (!map.getSource(fragmentWorkspaceSourceId)) {
+            map.addSource(fragmentWorkspaceSourceId, {
+              type: 'geojson',
+              data: emptyFeatureCollection(),
+            })
+          }
+          const fragmentColor = ['coalesce', ['get', '__fragmentColor'], '#007c89']
+          if (!map.getLayer('twin-fragment-fill')) {
+            map.addLayer({
+              id: 'twin-fragment-fill',
+              type: 'fill',
+              source: fragmentWorkspaceSourceId,
+              filter: ['==', '$type', 'Polygon'],
+              paint: {
+                'fill-color': fragmentColor,
+                'fill-opacity': 0.42,
+              },
+              layout: { visibility: 'none' },
+            })
+          }
+          if (!map.getLayer('twin-fragment-line')) {
+            map.addLayer({
+              id: 'twin-fragment-line',
+              type: 'line',
+              source: fragmentWorkspaceSourceId,
+              paint: {
+                'line-color': fragmentColor,
+                'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.9, 12, 1.8, 16, 4.6],
+                'line-opacity': 0.84,
+              },
+              layout: {
+                visibility: 'none',
+                'line-cap': 'round',
+                'line-join': 'round',
+              },
+            })
+          }
+          if (!map.getLayer('twin-fragment-points')) {
+            map.addLayer({
+              id: 'twin-fragment-points',
+              type: 'circle',
+              source: fragmentWorkspaceSourceId,
+              filter: ['==', '$type', 'Point'],
+              paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 2, 13, 4, 17, 8],
+                'circle-color': fragmentColor,
+                'circle-stroke-color': '#ffffff',
+                'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 8, 0.4, 15, 1.2],
+                'circle-opacity': 0.84,
+                'circle-stroke-opacity': 0.9,
+              },
+              layout: { visibility: 'none' },
+            })
+          }
+          fragmentWorkspaceLayerIds.forEach((id) => {
+            if (map.getLayer(id)) map.moveLayer(id)
+          })
+          setFragmentWorkspaceOpacity(opacity)
+        }
+
+        function setFragmentWorkspaceVisibility(visible) {
+          fragmentWorkspaceLayerIds.forEach((id) => {
+            if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none')
+          })
+        }
+
+        function setFragmentWorkspaceResult(message = {}) {
+          if (!map || !mapReady) return
+          const tileFragments = fragmentWorkspaceTileFragments(message)
+          if (tileFragments.length) {
+            removeFragmentWorkspaceGeojsonSource()
+            const sourceCount = installFragmentWorkspaceVectorSources(tileFragments, message.options || {})
+            const featureCount = Number(message.summary?.rendered ?? message.summary?.total ?? 0)
+            const total = Number(message.summary?.total ?? featureCount)
+            const boundsCollection = boundsFeatureCollection(message.summary?.bounds, 'Fragment workspace bounds')
+            if (hasFeatures(boundsCollection)) fitGeoJson(boundsCollection)
+            const label = String(featureCount.toLocaleString('en-US')) + ' fragment features as tiles' + (total > featureCount ? ' / ' + String(total.toLocaleString('en-US')) + ' total' : '')
+            setTileStatus(label, false)
+            broadcast('twin:viewport', {
+              mode: 'fragment-workspace-tiles',
+              label,
+              returned: featureCount,
+              resultCount: total,
+              sourceCount,
+              truncated: Boolean(message.summary?.truncated || total > featureCount),
+            })
+            return
+          }
+          removeFragmentWorkspaceVectorSources()
+          ensureFragmentWorkspaceLayers(message.options?.opacity)
+          const collection = fragmentWorkspaceCollection(message)
+          const source = map.getSource(fragmentWorkspaceSourceId)
+          if (source?.setData) source.setData(collection)
+          const featureCount = collection.features?.length || 0
+          setFragmentWorkspaceVisibility(featureCount > 0)
+          if (featureCount > 0) fitGeoJson(collection)
+          const total = Number(message.summary?.total ?? featureCount)
+          const label = String(featureCount.toLocaleString('en-US')) + ' fragment features' + (total > featureCount ? ' / ' + String(total.toLocaleString('en-US')) + ' total' : '')
+          setTileStatus(label, false)
+          broadcast('twin:viewport', {
+            mode: 'fragment-workspace',
+            label,
+            returned: featureCount,
+            resultCount: total,
+            truncated: Boolean(message.summary?.truncated || total > featureCount),
+          })
+        }
+
+        function clearFragmentWorkspaceResult() {
+          if (!map || !mapReady) return
+          removeFragmentWorkspaceVectorSources()
+          removeFragmentWorkspaceGeojsonSource()
+          setFragmentWorkspaceVisibility(false)
+          broadcast('twin:viewport', {
+            mode: 'fragment-workspace-cleared',
+            label: 'Fragment layer cleared',
+            returned: 0,
+            truncated: false,
+          })
+        }
+
         function removeFeatureSource() {
           featureLayerIds.forEach((id) => {
             if (map.getLayer(id)) map.removeLayer(id)
@@ -615,7 +943,7 @@ export function renderMapLibreSourceRuntime() {
           }
           sourceRevision += 1
           const revision = sourceRevision
-          setSourceLoading(true, 'Loading radius tiles')
+          setSourceLoading(true, 'Loading city tiles')
           map.addSource(viewportSourceId, {
             type: 'vector',
             tiles: [nextUrl],
@@ -625,23 +953,26 @@ export function renderMapLibreSourceRuntime() {
           addFeatureLayers()
           updateFeatureLayerVisibility()
           const requestedPercent = Math.round(scaleState.coveragePercent)
+          const tileModeLabel = requestedPercent >= 100
+            ? 'Full city tiles active'
+            : requestedPercent + '% radius guide over city tiles'
           map.once('idle', () => {
             if (revision !== sourceRevision) return
             window.clearTimeout(pendingSourceTimer)
-            setSourceLoading(false, 'Radius tiles ready')
+            setSourceLoading(false, 'City tiles ready')
             broadcast('twin:viewport', {
               mode: 'tiles',
-              label: requestedPercent + '% city radius active',
+              label: tileModeLabel,
               returned: null,
               truncated: false,
             })
           })
           pendingSourceTimer = window.setTimeout(() => {
             if (revision !== sourceRevision) return
-            setSourceLoading(false, 'Radius tiles active')
+            setSourceLoading(false, 'City tiles active')
             broadcast('twin:viewport', {
               mode: 'tiles',
-              label: requestedPercent + '% city radius active',
+              label: tileModeLabel,
               returned: null,
               truncated: false,
             })

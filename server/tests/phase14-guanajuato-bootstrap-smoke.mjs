@@ -30,7 +30,7 @@ const city = {
   municipalityDescription: 'Capital city of Guanajuato, Mexico',
 }
 const bbox = [-101.35, 20.94, -101.15, 21.12]
-const release = '2026-04-15.0'
+const release = '2026-06-17.0'
 
 function bboxMultiPolygonSql() {
   return `ST_Multi(ST_MakeEnvelope(${bbox.join(',')}, 4326))`

@@ -15,7 +15,7 @@ const WorkspaceModuleNav = ({ activeTab }) => (
             {tabs.map((tab) => (
               <Link
                 className={tab.key === activeTab ? 'is-active' : ''}
-                href={tab.key === 'overview' ? '/cockpit' : `/cockpit?module=${tab.key}`}
+                href={tab.key === 'overview' ? '/workspace' : tab.key === 'standards' ? '/standards' : `/workspace?module=${tab.key}`}
                 key={tab.key}
               >
                 {tab.label}

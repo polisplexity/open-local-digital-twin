@@ -14,6 +14,11 @@ export function renderCityCesiumQuerySelectionRuntime() {
         }
 
         function clearQuerySelection() {
+          queryRenderSequence += 1
+          if (queryRenderTimer) {
+            window.clearTimeout(queryRenderTimer)
+            queryRenderTimer = null
+          }
           activeQuerySelection = null
           activeCameraFocusBounds = null
           boundedCameraState = null
@@ -31,36 +36,76 @@ export function renderCityCesiumQuerySelectionRuntime() {
 
         function applyQuerySelection(message = {}) {
           const primitiveFeatures = getPrimitiveFeatures(message.primitives)
-          const features = primitiveFeatures.length
+          const allFeatures = primitiveFeatures.length
             ? primitiveFeatures.map(featureFromPrimitive).filter(Boolean)
             : getFeatures(message.geojson || featureCollection([]))
+          const renderBudget = Math.max(0, Number(message.query?.render?.viewerRenderBudget ?? CITY3D_QUERY_INTERACTIVE_FEATURE_BUDGET))
+          const features = renderBudget > 0 && allFeatures.length > renderBudget
+            ? allFeatures.slice(0, renderBudget)
+            : allFeatures
+          const referenceOnly = Boolean(message.selectionReference) && !allFeatures.length
           activeQuerySelection = message
+          queryRenderSequence += 1
+          if (queryRenderTimer) {
+            window.clearTimeout(queryRenderTimer)
+            queryRenderTimer = null
+          }
+          const renderSequence = queryRenderSequence
           removeQueryDataSources()
           queryDataSource = new CesiumLib.CustomDataSource('semantic-query')
           viewer.dataSources.add(queryDataSource)
 
           let rendered = 0
-          features.forEach((feature) => {
-            const layerKey = layerKeyForFeature(feature)
-            rendered += addGeometry(queryDataSource, feature, layerKey)
-          })
-          applySceneVisualTheme()
-
-          const returned = Number(message.summary?.returned ?? features.length ?? rendered)
+          let cursor = 0
+          const returned = Number(message.summary?.returned ?? allFeatures.length ?? features.length ?? rendered)
           const selected = Number(message.summary?.resultCount ?? returned)
-          const truncated = Boolean(message.summary?.truncated || (Number.isFinite(selected) && selected > rendered))
-          setStatus(String(rendered) + ' rendered / ' + String(Number.isFinite(selected) ? selected : returned) + ' selected' + (truncated ? ' +' : ''))
-          broadcast('twin:viewport', {
-            mode: 'semantic-query',
-            label: String(rendered) + ' 3D features rendered' + (truncated ? ' +' : ''),
-            returned,
-            rendered,
-            resultCount: Number.isFinite(selected) ? selected : rendered,
-            truncated,
-          })
-          fitQuerySelection(message, message.geojson || featureCollection([]))
-          if (phenomenaMode !== 'off') queuePhenomenaMode(phenomenaMode)
-          viewer.scene.requestRender()
+          const totalSelected = Number.isFinite(selected) ? selected : returned
+          const clippedByBudget = features.length < allFeatures.length
+          const finishRender = () => {
+            if (renderSequence !== queryRenderSequence) return
+            applySceneVisualTheme()
+            const truncated = Boolean(message.summary?.truncated || clippedByBudget || (Number.isFinite(selected) && selected > rendered))
+            setStatus(referenceOnly
+              ? String(totalSelected) + ' selected by reference'
+              : String(rendered) + ' rendered / ' + String(totalSelected) + ' selected' + (truncated ? ' +' : ''))
+            broadcast('twin:viewport', {
+              mode: referenceOnly ? 'semantic-query-reference' : 'semantic-query',
+              label: referenceOnly
+                ? String(totalSelected) + ' 3D features referenced'
+                : String(rendered) + ' 3D features rendered' + (truncated ? ' +' : ''),
+              returned,
+              rendered,
+              resultCount: totalSelected,
+              renderBudget,
+              truncated,
+            })
+            fitQuerySelection(message, message.geojson || featureCollection([]))
+            if (phenomenaMode !== 'off') queuePhenomenaMode(phenomenaMode)
+            viewer.scene.requestRender()
+          }
+          const renderNextBatch = () => {
+            if (renderSequence !== queryRenderSequence) return
+            const batchEnd = Math.min(features.length, cursor + CITY3D_QUERY_RENDER_BATCH_SIZE)
+            for (; cursor < batchEnd; cursor += 1) {
+              const feature = features[cursor]
+              const layerKey = layerKeyForFeature(feature)
+              rendered += addGeometry(queryDataSource, feature, layerKey)
+            }
+            if (cursor < features.length) {
+              setStatus('Rendering 3D selection', String(rendered.toLocaleString('en-US')) + ' / ' + String(features.length.toLocaleString('en-US')) + ' features')
+              viewer.scene.requestRender()
+              queryRenderTimer = window.setTimeout(renderNextBatch, 0)
+              return
+            }
+            queryRenderTimer = null
+            finishRender()
+          }
+          if (referenceOnly || !features.length) {
+            finishRender()
+            return
+          }
+          setStatus('Rendering 3D selection', 'Preparing ' + String(features.length.toLocaleString('en-US')) + ' visible features')
+          renderNextBatch()
         }
 
         async function applyInitialSharedQuery() {

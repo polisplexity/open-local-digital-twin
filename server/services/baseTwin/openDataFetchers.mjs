@@ -2,6 +2,7 @@ import { buildBoundaryTiles, fallbackBoundary } from './geoUtils.mjs'
 
 const REQUEST_TIMEOUT_MS = 30000
 const DEFAULT_OVERPASS_MAX_TILES = 48
+const NOMINATIM_BOUNDARY_RESULT_LIMIT = 10
 
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
@@ -17,7 +18,7 @@ async function fetchJson(url, options = {}) {
       ...options,
       headers: {
         Accept: 'application/json',
-        'User-Agent': 'OpenLocalDigitalTwin/0.1 (+https://github.com/polisplexity/open-local-digital-twin)',
+        'User-Agent': 'OpenLocalDigitalTwin/0.2 (+https://github.com/polisplexity/open-local-digital-twin)',
         ...(options.headers ?? {}),
       },
       signal: controller.signal,
@@ -57,8 +58,31 @@ out geom;
 `.trim()
 }
 
+export function isNominatimPolygonBoundaryCandidate(candidate) {
+  return ['Polygon', 'MultiPolygon'].includes(candidate?.geojson?.type)
+}
+
+function scoreNominatimBoundaryCandidate(candidate) {
+  if (!isNominatimPolygonBoundaryCandidate(candidate)) return -1
+  let score = 1000
+  if (candidate.category === 'boundary' || candidate.class === 'boundary') score += 500
+  if (candidate.type === 'administrative') score += 300
+  if (candidate.osm_type === 'relation') score += 100
+  if (candidate.geojson?.type === 'MultiPolygon') score += 25
+  const importance = Number(candidate.importance)
+  if (Number.isFinite(importance)) score += importance
+  return score
+}
+
+export function selectNominatimBoundaryCandidate(results) {
+  if (!Array.isArray(results) || results.length === 0) return null
+  return [...results]
+    .filter(isNominatimPolygonBoundaryCandidate)
+    .sort((left, right) => scoreNominatimBoundaryCandidate(right) - scoreNominatimBoundaryCandidate(left))[0] ?? null
+}
+
 export async function fetchBoundary(city) {
-  const sourceUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&limit=1${city.countryCode ? `&countrycodes=${encodeURIComponent(city.countryCode)}` : ''}&q=${encodeURIComponent(city.nominatimQuery)}`
+  const sourceUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&limit=${NOMINATIM_BOUNDARY_RESULT_LIMIT}${city.countryCode ? `&countrycodes=${encodeURIComponent(city.countryCode)}` : ''}&q=${encodeURIComponent(city.nominatimQuery)}`
   try {
     const results = await fetchJson(sourceUrl, {
       headers: {
@@ -78,7 +102,7 @@ export async function fetchBoundary(city) {
         },
       },
     ]
-    const top = Array.isArray(results) ? results[0] : null
+    const top = selectNominatimBoundaryCandidate(results)
     if (!top?.geojson) {
       return {
         center: { lat: city.lat, lon: city.lon },

@@ -1,6 +1,6 @@
 import { closeSharedProductionPool, withProductionClient as withClient } from './serviceDatabase.mjs'
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = []
 const DEFAULT_LIMIT = 100
 const MAX_LIMIT = 1000
 
@@ -58,6 +58,31 @@ function parseBbox(raw) {
   const [minx, miny, maxx, maxy] = parts
   if (minx >= maxx || miny >= maxy) throw new Error('INVALID_BBOX')
   return { minx, miny, maxx, maxy }
+}
+
+function modelDatasetIdentifier(cityId, modelKey, modelVersion) {
+  return [
+    'tbs:model-enrichment',
+    cityId,
+    String(modelKey ?? 'model').replace(/[^A-Za-z0-9._~-]+/g, '-'),
+    String(modelVersion ?? 'unknown').replace(/[^A-Za-z0-9._~-]+/g, '-'),
+  ].join(':')
+}
+
+function csvCell(value) {
+  if (value == null) return ''
+  const normalized = value instanceof Date ? value.toISOString() : value
+  const text = typeof normalized === 'object' ? JSON.stringify(normalized) : String(normalized)
+  return `"${text.replaceAll('"', '""')}"`
+}
+
+function outputCellValue(output) {
+  if (!output || typeof output !== 'object') return ''
+  if (output.valueNumeric != null) return output.valueNumeric
+  if (output.valueText != null) return output.valueText
+  if (output.value?.value != null) return output.value.value
+  if (output.value != null && Object.keys(output.value).length > 0) return output.value
+  return ''
 }
 
 async function listCityIds(client, requestedCityIds) {
@@ -137,13 +162,17 @@ async function ensureOgcCollections(client, cityId) {
         jsonb_build_object(
           'type', 'object',
           'geometryModel', et.geometry_model,
-          'standardsMapping', et.standards_mapping
+          'standardsMapping', et.standards_mapping,
+          'modelEnrichmentProperties', COALESCE(enrichment_counts.output_keys, ARRAY[]::text[])
         ),
         jsonb_build_object(
           'phase', 'phase-4-interop',
           'entityFamily', et.entity_family,
           'description', et.description,
-          'featureCount', counts.feature_count
+          'featureCount', counts.feature_count,
+          'modelEnrichmentEntityCount', COALESCE(enrichment_counts.entity_count, 0),
+          'modelKeys', COALESCE(enrichment_counts.model_keys, ARRAY[]::text[]),
+          'modelOutputKeys', COALESCE(enrichment_counts.output_keys, ARRAY[]::text[])
         )
       FROM ldt_core.entity_type_registry et
       JOIN (
@@ -152,6 +181,18 @@ async function ensureOgcCollections(client, cityId) {
         WHERE city_id = $1
         GROUP BY entity_type
       ) counts ON counts.entity_type = et.entity_type
+      LEFT JOIN (
+        SELECT
+          ce.entity_type,
+          count(DISTINCT summary.entity_id)::int AS entity_count,
+          array_remove(array_agg(DISTINCT summary.model_key ORDER BY summary.model_key), NULL) AS model_keys,
+          array_remove(array_agg(DISTINCT output_key ORDER BY output_key), NULL) AS output_keys
+        FROM ldt_enrichment.entity_model_output_summary summary
+        JOIN ldt_core.city_entities ce ON ce.id = summary.entity_id
+        CROSS JOIN LATERAL jsonb_object_keys(summary.outputs) AS output_keys(output_key)
+        WHERE summary.city_id = $1
+        GROUP BY ce.entity_type
+      ) enrichment_counts ON enrichment_counts.entity_type = et.entity_type
       WHERE et.enabled = true
       ON CONFLICT (city_id, collection_key) DO UPDATE SET
         title = EXCLUDED.title,
@@ -163,10 +204,204 @@ async function ensureOgcCollections(client, cityId) {
   )
 }
 
+async function buildModelEnrichmentDcatDatasets(client, cityId, baseUrl, cityName) {
+  const base = normalizedBaseUrl(baseUrl)
+  const result = await client.query(
+    `
+      SELECT
+        summary.model_key,
+        summary.model_version,
+        count(DISTINCT summary.entity_id)::int AS entity_count,
+        count(*)::int AS output_count,
+        array_remove(array_agg(DISTINCT ce.entity_type ORDER BY ce.entity_type), NULL) AS entity_types,
+        array_remove(
+          array_agg(DISTINCT COALESCE(oc.collection_key, replace(ce.entity_type, '_', '-'))),
+          NULL
+        ) AS collection_keys,
+        array_remove(array_agg(DISTINCT output_key ORDER BY output_key), NULL) AS output_keys,
+        array_remove(array_agg(DISTINCT output_value->>'confidence' ORDER BY output_value->>'confidence'), NULL) AS confidence_statuses,
+        array_remove(array_agg(DISTINCT output_value->>'authorityStatus' ORDER BY output_value->>'authorityStatus'), NULL) AS authority_statuses,
+        min(summary.latest_generated_at) AS first_generated_at,
+        max(summary.latest_generated_at) AS latest_generated_at,
+        max(summary.latest_ingested_at) AS latest_ingested_at,
+        COALESCE(run_meta.workflow_run_ids, ARRAY[]::text[]) AS workflow_run_ids,
+        COALESCE(run_meta.source_artifact_ids, ARRAY[]::text[]) AS source_artifact_ids
+      FROM ldt_enrichment.entity_model_output_summary summary
+      JOIN ldt_core.city_entities ce ON ce.id = summary.entity_id
+      LEFT JOIN ldt_interop.ogc_collections oc
+        ON oc.city_id = summary.city_id
+       AND oc.entity_type = ce.entity_type
+      LEFT JOIN (
+        SELECT
+          city_id,
+          model_key,
+          model_version,
+          array_remove(array_agg(DISTINCT workflow_run_id::text ORDER BY workflow_run_id::text), NULL) AS workflow_run_ids,
+          array_remove(array_agg(DISTINCT source_artifact_id::text ORDER BY source_artifact_id::text), NULL) AS source_artifact_ids
+        FROM ldt_enrichment.entity_model_outputs
+        WHERE city_id = $1
+        GROUP BY city_id, model_key, model_version
+      ) run_meta
+        ON run_meta.city_id = summary.city_id
+       AND run_meta.model_key = summary.model_key
+       AND run_meta.model_version = summary.model_version
+      CROSS JOIN LATERAL jsonb_each(summary.outputs) AS output_keys(output_key, output_value)
+      WHERE summary.city_id = $1
+      GROUP BY summary.model_key, summary.model_version, run_meta.workflow_run_ids, run_meta.source_artifact_ids
+      ORDER BY summary.model_key, summary.model_version
+    `,
+    [cityId],
+  )
+
+  return result.rows.map((row) => {
+    const identifier = modelDatasetIdentifier(cityId, row.model_key, row.model_version)
+    const entityTypes = Array.isArray(row.entity_types) ? row.entity_types : []
+    const collectionKeys = Array.isArray(row.collection_keys) ? row.collection_keys : []
+    const outputKeys = Array.isArray(row.output_keys) ? row.output_keys : []
+    const confidenceStatuses = Array.isArray(row.confidence_statuses) ? row.confidence_statuses : []
+    const authorityStatuses = Array.isArray(row.authority_statuses) ? row.authority_statuses : []
+    const modelOutputQuery = `modelKey=${encodeURIComponent(row.model_key)}&modelVersion=${encodeURIComponent(row.model_version ?? '')}`
+    return {
+      '@id': `urn:polisplexity:ldt:dataset:${identifier}`,
+      '@type': 'dcat:Dataset',
+      'dct:identifier': identifier,
+      'dct:title': `${cityName} ${row.model_key} model enrichment outputs`,
+      'dct:description': `Derived entity-level model outputs published from ldt_enrichment for ${entityTypes.join(', ') || 'city entities'}.`,
+      'dct:publisher': 'Polisplexity / Twin Base Studio',
+      'dct:license': 'model-output-contract-review-required',
+      'dct:accessRights': 'city-session',
+      'dct:accrualPeriodicity': 'as-needed',
+      'dct:issued': row.first_generated_at,
+      'dct:modified': row.latest_ingested_at ?? row.latest_generated_at,
+      'dcat:theme': ['model-enrichment', 'external-model-output', row.model_key].filter(Boolean),
+      'dcat:keyword': outputKeys,
+      'dcat:distribution': [
+        {
+          '@type': 'dcat:Distribution',
+          'dct:title': 'Model enrichment outputs CSV',
+          'dct:format': 'CSV',
+          'dcat:mediaType': 'text/csv',
+          'dcat:accessURL': `${base}/api/live/${cityId}/standards/model-outputs.csv?${modelOutputQuery}`,
+          'dcat:downloadURL': `${base}/api/live/${cityId}/standards/model-outputs.csv?${modelOutputQuery}`,
+        },
+        {
+          '@type': 'dcat:Distribution',
+          'dct:title': 'NGSI-LD entities with model enrichment properties',
+          'dct:format': 'JSON-LD',
+          'dcat:mediaType': 'application/ld+json',
+          'dcat:accessURL': `${base}/api/live/${cityId}/standards/ngsi-ld/entities?limit=100`,
+        },
+        ...collectionKeys.map((collectionKey) => ({
+          '@type': 'dcat:Distribution',
+          'dct:title': `OGC API Features ${collectionKey} items with model enrichment properties`,
+          'dct:format': 'GeoJSON',
+          'dcat:mediaType': 'application/geo+json',
+          'dcat:accessURL': `${base}/api/live/${cityId}/standards/ogc/collections/${collectionKey}/items?limit=100`,
+        })),
+        {
+          '@type': 'dcat:Distribution',
+          'dct:title': 'TwinQuery model-output query endpoint',
+          'dct:format': 'JSON',
+          'dcat:mediaType': 'application/json',
+          'dcat:accessURL': `${base}/api/live/${cityId}/twin-query`,
+        },
+      ],
+      'tbs:quality': [
+        {
+          dimension: 'method',
+          score: null,
+          statement: 'Derived model output. Review model version, warnings, confidence, and source artifact before treating as authoritative.',
+        },
+      ],
+      'tbs:metadata': {
+        sourceTable: 'ldt_enrichment.entity_model_outputs',
+        readModel: 'ldt_enrichment.entity_model_output_summary',
+        modelKey: row.model_key,
+        modelVersion: row.model_version,
+        entityTypes,
+        collectionKeys,
+        outputKeys,
+        confidenceStatuses,
+        authorityStatuses,
+        entityCount: Number(row.entity_count ?? 0),
+        outputCount: Number(row.output_count ?? 0),
+        workflowRunIds: Array.isArray(row.workflow_run_ids) ? row.workflow_run_ids : [],
+        sourceArtifactIds: Array.isArray(row.source_artifact_ids) ? row.source_artifact_ids : [],
+        latestGeneratedAt: row.latest_generated_at,
+        latestIngestedAt: row.latest_ingested_at,
+      },
+    }
+  })
+}
+
+export async function getModelOutputCsv(
+  cityId,
+  { modelKey, modelVersion = '', limit } = {},
+) {
+  if (!modelKey) throw new Error('MODEL_KEY_REQUIRED')
+  return await withClient(async (client) => {
+    const rowLimit = parseLimit(limit ?? 1000)
+    const result = await client.query(
+      `
+        SELECT
+          ce.stable_id,
+          ce.entity_type,
+          ce.label,
+          ce.canonical_uri,
+          summary.model_key,
+          summary.model_version,
+          summary.outputs,
+          summary.latest_generated_at,
+          summary.latest_ingested_at
+        FROM ldt_enrichment.entity_model_output_summary summary
+        JOIN ldt_core.city_entities ce ON ce.id = summary.entity_id
+        WHERE summary.city_id = $1
+          AND summary.model_key = $2
+          AND summary.model_version = $3
+        ORDER BY ce.entity_type, ce.stable_id
+        LIMIT $4
+      `,
+      [cityId, modelKey, modelVersion, rowLimit],
+    )
+    const outputKeys = Array.from(new Set(
+      result.rows.flatMap((row) => Object.keys(row.outputs ?? {})),
+    )).sort()
+    const headers = [
+      'stable_id',
+      'entity_type',
+      'label',
+      'canonical_uri',
+      'model_key',
+      'model_version',
+      'latest_generated_at',
+      'latest_ingested_at',
+      ...outputKeys,
+    ]
+    const lines = [
+      headers.map(csvCell).join(','),
+      ...result.rows.map((row) => headers.map((header) => {
+        if (outputKeys.includes(header)) return csvCell(outputCellValue(row.outputs?.[header]))
+        return csvCell(row[header])
+      }).join(',')),
+    ]
+    return {
+      ok: true,
+      cityId,
+      modelKey,
+      modelVersion,
+      rowCount: result.rowCount,
+      headers,
+      csv: `${lines.join('\n')}\n`,
+    }
+  })
+}
+
 async function buildDcatCatalog(client, cityId, baseUrl) {
   const base = normalizedBaseUrl(baseUrl)
   const city = await cityRecord(client, cityId)
   const bbox = await cityBbox(client, cityId)
+  await ensureOgcCollections(client, cityId)
+  const modelEnrichmentDatasets = await buildModelEnrichmentDcatDatasets(client, cityId, baseUrl, city.name)
   const datasets = await client.query(
     `
       SELECT
@@ -250,23 +485,26 @@ async function buildDcatCatalog(client, cityId, baseUrl) {
       country: city.country,
       region: city.region,
     },
-    'dcat:dataset': datasets.rows.map((dataset) => ({
-      '@id': `urn:polisplexity:ldt:dataset:${dataset.identifier}`,
-      '@type': 'dcat:Dataset',
-      'dct:identifier': dataset.identifier,
-      'dct:title': dataset.title,
-      'dct:description': dataset.description,
-      'dct:publisher': dataset.publisher,
-      'dct:license': dataset.license,
-      'dct:accessRights': dataset.access_rights,
-      'dct:accrualPeriodicity': dataset.update_frequency,
-      'dct:issued': dataset.issued_at,
-      'dct:modified': dataset.modified_at,
-      'dcat:distribution': dataset.distributions,
-      'tbs:licenses': dataset.licenses,
-      'tbs:quality': dataset.quality,
-      'tbs:metadata': dataset.metadata,
-    })),
+    'dcat:dataset': [
+      ...datasets.rows.map((dataset) => ({
+        '@id': `urn:polisplexity:ldt:dataset:${dataset.identifier}`,
+        '@type': 'dcat:Dataset',
+        'dct:identifier': dataset.identifier,
+        'dct:title': dataset.title,
+        'dct:description': dataset.description,
+        'dct:publisher': dataset.publisher,
+        'dct:license': dataset.license,
+        'dct:accessRights': dataset.access_rights,
+        'dct:accrualPeriodicity': dataset.update_frequency,
+        'dct:issued': dataset.issued_at,
+        'dct:modified': dataset.modified_at,
+        'dcat:distribution': dataset.distributions,
+        'tbs:licenses': dataset.licenses,
+        'tbs:quality': dataset.quality,
+        'tbs:metadata': dataset.metadata,
+      })),
+      ...modelEnrichmentDatasets,
+    ],
     'dcat:service': [
       {
         '@type': 'dcat:DataService',
@@ -322,6 +560,18 @@ async function refreshNgsiProjections(client, cityId) {
         JOIN ldt_core.city_entities ce ON ce.id = ese.entity_id
         WHERE ce.city_id = $1
         GROUP BY ese.entity_id
+      ),
+      model_enrichments AS (
+        SELECT
+          summary.entity_id,
+          jsonb_object_agg(summary.model_key, summary.outputs ORDER BY summary.model_key) AS model_enrichments,
+          max(NULLIF(summary.outputs #>> '{sap_score,valueNumeric}', '')::numeric)
+            FILTER (WHERE summary.model_key = 'eu-ldt-ecobuild') AS sap_score,
+          max(NULLIF(summary.outputs #>> '{energy_label,valueText}', ''))
+            FILTER (WHERE summary.model_key = 'eu-ldt-ecobuild') AS energy_label
+        FROM ldt_enrichment.entity_model_output_summary summary
+        WHERE summary.city_id = $1
+        GROUP BY summary.entity_id
       ),
       projected AS (
         SELECT
@@ -386,6 +636,37 @@ async function refreshNgsiProjections(client, cityId) {
               'oneway', jsonb_build_object('type', 'Property', 'value', re.oneway)
             ))
             ELSE '{}'::jsonb
+          END ||
+          CASE
+            WHEN me.model_enrichments IS NULL THEN '{}'::jsonb
+            ELSE jsonb_build_object(
+              'modelEnrichments',
+              jsonb_build_object(
+                'type', 'Property',
+                'value', me.model_enrichments
+              )
+            )
+          END ||
+          CASE
+            WHEN me.sap_score IS NULL THEN '{}'::jsonb
+            ELSE jsonb_build_object(
+              'sapScore',
+              jsonb_build_object(
+                'type', 'Property',
+                'value', me.sap_score,
+                'unitCode', 'score_0_100'
+              )
+            )
+          END ||
+          CASE
+            WHEN me.energy_label IS NULL THEN '{}'::jsonb
+            ELSE jsonb_build_object(
+              'energyLabel',
+              jsonb_build_object(
+                'type', 'Property',
+                'value', me.energy_label
+              )
+            )
           END AS ngsi_payload
         FROM ldt_core.city_entities ce
         JOIN ldt_interop.ngsi_entity_mappings nem
@@ -394,6 +675,7 @@ async function refreshNgsiProjections(client, cityId) {
         LEFT JOIN ldt_core.building_entities be ON be.entity_id = ce.id
         LEFT JOIN ldt_core.road_entities re ON re.entity_id = ce.id
         LEFT JOIN evidence_counts ec ON ec.entity_id = ce.id
+        LEFT JOIN model_enrichments me ON me.entity_id = ce.id
         WHERE ce.city_id = $1
       )
       INSERT INTO ldt_interop.ngsi_entity_projections (
@@ -632,29 +914,33 @@ export async function getOgcCollectionItems(
     const base = normalizedBaseUrl(baseUrl)
     const params = [cityId, entityType, rowLimit, rowOffset]
     const bboxClause = parsedBbox
-      ? 'AND ce.geom && ST_MakeEnvelope($5, $6, $7, $8, 4326) AND ST_Intersects(ce.geom, ST_MakeEnvelope($5, $6, $7, $8, 4326))'
+      ? 'AND co.geom && ST_MakeEnvelope($5, $6, $7, $8, 4326) AND ST_Intersects(co.geom, ST_MakeEnvelope($5, $6, $7, $8, 4326))'
       : ''
     if (parsedBbox) params.push(parsedBbox.minx, parsedBbox.miny, parsedBbox.maxx, parsedBbox.maxy)
 
     const result = await client.query(
       `
         SELECT
-          ce.id,
-          ce.stable_id,
-          ce.entity_type,
-          ce.label,
-          ce.authority_status,
-          ce.confidence,
+          co.id,
+          co.stable_id,
+          co.entity_type,
+          co.label,
+          co.authority_status,
+          co.confidence,
           ce.lifecycle_status,
           ce.canonical_uri,
-          ce.properties,
-          ST_AsGeoJSON(ce.geom)::jsonb AS geometry
-        FROM ldt_core.city_entities ce
-        WHERE ce.city_id = $1
-          AND ce.entity_type = $2
-          AND ce.geom IS NOT NULL
+          co.properties,
+          co.model_enrichments,
+          co.sap_score,
+          co.energy_label,
+          ST_AsGeoJSON(co.geom)::jsonb AS geometry
+        FROM ldt_query.city_objects_enriched co
+        JOIN ldt_core.city_entities ce ON ce.id = co.id
+        WHERE co.city_id = $1
+          AND co.entity_type = $2
+          AND co.geom IS NOT NULL
           ${bboxClause}
-        ORDER BY ce.stable_id
+        ORDER BY co.stable_id
         LIMIT $3
         OFFSET $4
       `,
@@ -686,6 +972,9 @@ export async function getOgcCollectionItems(
           authorityStatus: row.authority_status,
           confidence: row.confidence,
           lifecycleStatus: row.lifecycle_status,
+          modelEnrichments: row.model_enrichments ?? {},
+          sapScore: row.sap_score == null ? undefined : Number(row.sap_score),
+          energyLabel: row.energy_label ?? undefined,
           ...row.properties,
         },
       })),

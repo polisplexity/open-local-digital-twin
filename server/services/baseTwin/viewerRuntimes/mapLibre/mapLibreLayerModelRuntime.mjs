@@ -30,11 +30,11 @@ export function renderMapLibreLayerModelRuntime() {
           const coverage = clamp(scaleState.coveragePercent, 0, 100)
           const detail = strongestDetail()
           const requestedLimit = Number(scaleState.featureLimit || 0)
-          const adaptiveLimit = 8000 + coverage * 920
+          const adaptiveLimit = 2500 + coverage * 95
           const base = requestedLimit > 0
             ? Math.min(requestedLimit, adaptiveLimit)
             : adaptiveLimit
-          return Math.round(clamp(base * (0.8 + detail * 0.6), 1000, 300000))
+          return Math.round(clamp(base * (0.75 + detail * 0.45), 1000, 12000))
         }
 
         function tileUrl() {
@@ -43,11 +43,7 @@ export function renderMapLibreLayerModelRuntime() {
           const params = new URLSearchParams()
           params.set('layers', layers.join(','))
           params.set('limit', String(tileLimit()))
-          if (scaleState.coveragePercent < 100) {
-            params.set('center', cityCenter[0].toFixed(7) + ',' + cityCenter[1].toFixed(7))
-            params.set('radiusMeters', String(Math.round(radiusMetersForCoverage())))
-          }
-          return window.location.origin + '/api/live/' + encodeURIComponent(cityId) + '/tiles/{z}/{x}/{y}.mvt?' + params.toString()
+          return window.location.origin + '/api/live/' + encodeURIComponent(cityId) + '/cached-tiles/latest/{z}/{x}/{y}.mvt?' + params.toString()
         }
 
         function radiusBbox() {

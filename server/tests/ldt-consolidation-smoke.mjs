@@ -3,7 +3,7 @@ import { getProductionDatabaseUrl } from '../db/migrate.mjs'
 
 const { Client } = pg
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = ['guanajuato']
 const REQUIRED_ENTITY_TYPES = ['building', 'road', 'facility', 'green_blue_system', 'place']
 
 function assert(condition, message) {

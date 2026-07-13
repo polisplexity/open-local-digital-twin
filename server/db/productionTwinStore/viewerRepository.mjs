@@ -1,10 +1,10 @@
 import { getProductionPool } from '../postgisPool.mjs'
 import { viewerFeatureProperties } from './featurePresentation.mjs'
 
-const DEFAULT_VIEWPORT_FEATURE_LIMIT = 300000
-const MAX_VIEWPORT_FEATURE_LIMIT = 300000
-const DEFAULT_TILE_FEATURE_LIMIT = 300000
-const MAX_TILE_FEATURE_LIMIT = 300000
+const DEFAULT_VIEWPORT_FEATURE_LIMIT = 8000
+const MAX_VIEWPORT_FEATURE_LIMIT = 50000
+const DEFAULT_TILE_FEATURE_LIMIT = 12000
+const MAX_TILE_FEATURE_LIMIT = 50000
 
 function parseMaybeJson(value, fallback = null) {
   if (value == null) return fallback

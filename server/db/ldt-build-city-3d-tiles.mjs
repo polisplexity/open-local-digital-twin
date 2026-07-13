@@ -7,12 +7,13 @@ function argValue(name) {
   return arg ? arg.slice(prefix.length) : ''
 }
 
-const cityId = argValue('city') || process.env.TWIN_STUDIO_E2E_CITY_ID || process.env.TWIN_STUDIO_CITY_ID || 'kharkiv'
+const cityId = argValue('city') || process.env.TWIN_STUDIO_E2E_CITY_ID || process.env.TWIN_STUDIO_CITY_ID || ''
 const tilesetKey = argValue('tileset-key') || process.env.TWIN_STUDIO_3D_TILESET_KEY || 'base-buildings'
 const version = argValue('version') || process.env.TWIN_STUDIO_3D_TILESET_VERSION || ''
 const limit = argValue('limit') || process.env.TWIN_STUDIO_3D_TILES_BUILDING_LIMIT || ''
 
 try {
+  if (!cityId) throw new Error('CITY_ID_REQUIRED: pass --city=<city-id> or set TWIN_STUDIO_CITY_ID')
   const result = await buildCity3dBuildingTileset({
     cityId,
     tilesetKey,
@@ -26,4 +27,3 @@ try {
 } finally {
   await closeProductionPool()
 }
-

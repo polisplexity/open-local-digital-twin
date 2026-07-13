@@ -34,26 +34,18 @@ async function fetchText(url, options = {}) {
 const baseUrl = (argValue('base-url') || process.env.TWIN_STUDIO_SMOKE_BASE_URL || 'http://127.0.0.1:4192').replace(/\/$/, '')
 const email = argValue('email') || process.env.TWIN_STUDIO_SMOKE_EMAIL
 const password = argValue('password') || process.env.TWIN_STUDIO_SMOKE_PASSWORD
-const cityId = argValue('city') || process.env.TWIN_STUDIO_E2E_CITY_ID || 'kharkiv'
+const cityId = argValue('city') || process.env.TWIN_STUDIO_E2E_CITY_ID || 'guanajuato'
 
 assert(email, 'SMOKE_EMAIL_REQUIRED')
 assert(password, 'SMOKE_PASSWORD_REQUIRED')
 
-const productRoutes = ['/cockpit', '/analytical-map', '/city-3d', '/civic-xr']
-const protectedRoutes = [...productRoutes, '/live/current/map', '/live/current/3d', '/live/current/immersive']
-const legacyRouteRedirects = {
-  '/map': '/analytical-map',
-  '/municipal': '/city-3d',
-  '/public': '/civic-xr',
-}
+const productRoutes = ['/cockpit', '/analytical-map', '/city-3d', '/civic-xr', '/docs']
+const protectedRoutes = [...productRoutes, '/docs/reference/user-manual', '/live/current/map', '/live/current/3d', '/live/current/immersive']
+const retiredRoutes = ['/dashboard', '/map', '/municipal', '/public', '/civic-view']
 
-for (const [route, target] of Object.entries(legacyRouteRedirects)) {
+for (const route of retiredRoutes) {
   const { response } = await fetchText(`${baseUrl}${route}`)
-  assert([301, 302, 307, 308].includes(response.status), `LEGACY_ROUTE_SHOULD_REDIRECT:${route}:${response.status}`)
-  assert(
-    String(response.headers.get('location') ?? '') === target,
-    `LEGACY_ROUTE_REDIRECT_TARGET_INVALID:${route}:${response.headers.get('location')}`,
-  )
+  assert(response.status === 404, `RETIRED_ROUTE_SHOULD_404:${route}:${response.status}`)
 }
 
 for (const route of protectedRoutes) {
@@ -87,7 +79,7 @@ assert(cookie.includes('twin_session='), 'LOGIN_SESSION_COOKIE_MISSING')
 const routeChecks = [
   {
     route: '/cockpit',
-    includes: ['/_next/static/', 'Kharkiv LDT Workspace'],
+    includes: ['/_next/static/', 'Twin Base Studio'],
   },
   {
     route: '/analytical-map',
@@ -102,8 +94,17 @@ const routeChecks = [
     includes: ['/_next/static/'],
   },
   {
+    route: '/docs',
+    includes: ['/_next/static/', 'OLDT User Manual', 'Native OLDT', 'EU LDT integrations'],
+  },
+  {
+    route: '/docs/reference/user-manual',
+    includes: ['/_next/static/', 'USER_MANUAL.md', 'OLDT User Manual', 'Back to manual'],
+    contentType: 'text/html',
+  },
+  {
     route: '/live/current/map',
-    includes: ['/vendor/maplibre-gl/maplibre-gl.js', '/tiles/{z}/{x}/{y}.mvt', "broadcast('twin:error'"],
+    includes: ['/vendor/maplibre-gl/maplibre-gl.js', 'function addBaseSources()', "map.addSource('boundary'", "broadcast('twin:error'", 'id="map-basemap-switcher"', 'data-basemap="street"', 'data-basemap="satellite"'],
     excludes: ['/vendor/leaflet/leaflet.js'],
   },
   {
@@ -119,6 +120,9 @@ const routeChecks = [
       'data-phenomena-mode="airTemperature"',
       'data-phenomena-mode="surfaceWater"',
       'data-phenomena-mode="surfaceRunoff"',
+      'id="scene-basemap-switcher"',
+      'data-basemap="street"',
+      'data-basemap="satellite"',
     ],
     excludes: [
       '/vendor/leaflet/leaflet.js',
@@ -163,6 +167,12 @@ for (const check of routeChecks) {
     },
   })
   assert(response.status === 200, `ROUTE_NOT_OK:${check.route}:${response.status}`)
+  if (check.contentType) {
+    assert(
+      String(response.headers.get('content-type') ?? '').startsWith(check.contentType),
+      `ROUTE_CONTENT_TYPE_INVALID:${check.route}:${response.headers.get('content-type')}`,
+    )
+  }
   assert(!body.includes('Application error: a client-side exception'), `ROUTE_CLIENT_ERROR_MARKER:${check.route}`)
   assert(!body.includes('Could not load live city data'), `ROUTE_LIVE_DATA_ERROR_MARKER:${check.route}`)
   for (const marker of check.includes ?? []) {

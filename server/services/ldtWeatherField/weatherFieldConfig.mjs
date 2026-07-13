@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 
-export const DEFAULT_CITY_IDS = ['kharkiv']
+export const DEFAULT_CITY_IDS = []
 export const DEFAULT_SCENARIO_KEY = 'baseline'
 export const DEFAULT_WEATHER_GRID_RESOLUTION_M = 2500
 export const DEFAULT_BATCH_SIZE = 40

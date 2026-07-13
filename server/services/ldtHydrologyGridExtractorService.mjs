@@ -3,9 +3,11 @@ import crypto from 'node:crypto'
 import { closeSharedProductionPool, withProductionClient as withClient } from './serviceDatabase.mjs'
 import { refreshLdtObjectObservationSummary } from './ldtObservationSummaryService.mjs'
 
-const DEFAULT_CITY_IDS = ['kharkiv']
+const DEFAULT_CITY_IDS = []
 const DEFAULT_SCENARIO_KEY = 'baseline'
 const DEFAULT_RUN_LIMIT = 25
+const DEFAULT_MAX_HYDROLOGY_CELLS = 100000
+const DEFAULT_MAX_HYDROLOGY_OBJECT_OBSERVATIONS = 400000
 const HYDROLOGY_LAYER_KEY = 'hydrology_surface_water_signal'
 const WATER_SOURCE_CATEGORIES = [
   'water',
@@ -28,6 +30,45 @@ function integerValue(value, fallback, min, max) {
   const number = Number.parseInt(String(value ?? ''), 10)
   if (!Number.isFinite(number)) return fallback
   return Math.min(max, Math.max(min, number))
+}
+
+function booleanValue(value) {
+  if (value === true) return true
+  const text = String(value ?? '').trim().toLowerCase()
+  return ['1', 'true', 'yes', 'y', 'on'].includes(text)
+}
+
+function hydrologyLimits(options = {}) {
+  return {
+    maxCells: integerValue(
+      options.maxCells ?? process.env.TWIN_STUDIO_HYDROLOGY_MAX_CELLS,
+      DEFAULT_MAX_HYDROLOGY_CELLS,
+      1,
+      10000000,
+    ),
+    maxObjectObservations: integerValue(
+      options.maxObjectObservations ?? process.env.TWIN_STUDIO_HYDROLOGY_MAX_OBJECT_OBSERVATIONS,
+      DEFAULT_MAX_HYDROLOGY_OBJECT_OBSERVATIONS,
+      1,
+      10000000,
+    ),
+  }
+}
+
+function hydrologyExecutionPlan() {
+  return {
+    recommendedTarget: 'offline-data-factory',
+    localTwinStudioRole: 'import-and-visual-validation',
+    visualValidationRequired: true,
+    portableArtifacts: [
+      'postgis-environment-dump',
+      'pmtiles-or-mvt-directory',
+      'terrain-tiles-or-heightmap-package',
+      'city-3d-tiles-or-cesium-manifest',
+      'viewer-artifact-manifest',
+    ],
+    promotionGate: 'operator-visual-review-in-twin-studio',
+  }
 }
 
 function sha256(value) {
@@ -591,9 +632,120 @@ async function waterEvidenceCount(client, cityId) {
   return Number(result.rows[0]?.count ?? 0)
 }
 
+async function hydrologyPreflightForCity(client, cityId, options = {}) {
+  const scenarioKey = compactText(options.scenarioKey, DEFAULT_SCENARIO_KEY)
+  const limits = hydrologyLimits(options)
+  let sourceGridKey = ''
+  try {
+    sourceGridKey = await latestTerrainSourceGridKey(client, cityId, scenarioKey, options.sourceGridKey)
+  } catch (error) {
+    return {
+      ok: true,
+      cityId,
+      scenarioKey,
+      sourceGridKey: compactText(options.sourceGridKey) || null,
+      extractorKey: 'hydrology-grid',
+      canRun: false,
+      gateCode: 'HYDROLOGY_TERRAIN_SOURCE_MISSING',
+      limits,
+      counts: { terrainElevationCells: 0, terrainSlopeCells: 0, activeCityObjects: 0, waterEvidenceCount: 0 },
+      executionPlan: hydrologyExecutionPlan(),
+      messages: [String(error?.message || error)],
+    }
+  }
+
+  const result = await client.query(
+    `
+      SELECT
+        (SELECT count(*)::int
+         FROM ldt_environment.phenomenon_cells cells
+         JOIN ldt_environment.phenomenon_layers layers ON layers.id = cells.layer_id
+         WHERE cells.city_id = $1
+           AND cells.scenario_key = $2
+           AND cells.source_grid_key = $3
+           AND layers.layer_key = 'terrain_elevation_m') AS terrain_elevation_cells,
+        (SELECT count(*)::int
+         FROM ldt_environment.phenomenon_cells cells
+         JOIN ldt_environment.phenomenon_layers layers ON layers.id = cells.layer_id
+         WHERE cells.city_id = $1
+           AND cells.scenario_key = $2
+           AND cells.source_grid_key = $3
+           AND layers.layer_key = 'terrain_slope_deg') AS terrain_slope_cells,
+        (SELECT count(*)::int
+         FROM ldt_core.city_entities
+         WHERE city_id = $1
+           AND geom IS NOT NULL
+           AND lifecycle_status = 'active') AS active_city_objects,
+        (SELECT count(*)::int
+         FROM ldt_core.city_entities
+         WHERE city_id = $1
+           AND entity_type = 'green_blue_system'
+           AND lifecycle_status = 'active'
+           AND lower(COALESCE(
+             properties#>>'{sourceProperties,category}',
+             properties#>>'{sourceProperties,natural}',
+             properties#>>'{sourceProperties,waterway}',
+             properties#>>'{sourceProperties,water}',
+             label,
+             ''
+           )) = ANY($4::text[])) AS water_evidence_count
+    `,
+    [cityId, scenarioKey, sourceGridKey, WATER_SOURCE_CATEGORIES],
+  )
+  const row = result.rows[0] || {}
+  const counts = {
+    terrainElevationCells: Number(row.terrain_elevation_cells ?? 0),
+    terrainSlopeCells: Number(row.terrain_slope_cells ?? 0),
+    activeCityObjects: Number(row.active_city_objects ?? 0),
+    waterEvidenceCount: Number(row.water_evidence_count ?? 0),
+  }
+  const messages = []
+  if (counts.terrainElevationCells < 1) messages.push('No terrain elevation cells exist for the selected source grid.')
+  if (counts.terrainSlopeCells < 1) messages.push('No terrain slope cells exist for the selected source grid; hydrology can still fall back to flatness defaults but should be reviewed.')
+  if (counts.waterEvidenceCount < 1) messages.push('No mapped water evidence found; output will rely only on elevation and slope screening.')
+  const withinCellLimit = counts.terrainElevationCells <= limits.maxCells
+  const withinObjectLimit = counts.activeCityObjects <= limits.maxObjectObservations
+  if (!withinCellLimit) messages.push(`Estimated hydrology cells ${counts.terrainElevationCells} exceed limit ${limits.maxCells}.`)
+  if (!withinObjectLimit) messages.push(`Estimated object observations ${counts.activeCityObjects} exceed limit ${limits.maxObjectObservations}.`)
+
+  return {
+    ok: true,
+    cityId,
+    scenarioKey,
+    sourceGridKey,
+    extractorKey: 'hydrology-grid',
+    canRun: counts.terrainElevationCells > 0,
+    gateCode: counts.terrainElevationCells > 0 ? 'HYDROLOGY_PREFLIGHT_READY' : 'HYDROLOGY_TERRAIN_SOURCE_MISSING',
+    limits,
+    withinLimits: withinCellLimit && withinObjectLimit,
+    counts,
+    estimatedWrites: {
+      phenomenonCells: counts.terrainElevationCells,
+      objectObservationsUpperBound: counts.activeCityObjects,
+    },
+    executionPlan: hydrologyExecutionPlan(),
+    messages,
+  }
+}
+
+function assertHydrologyPreflightCanRun(preflight, options = {}) {
+  if (preflight.canRun !== true) {
+    const error = new Error(`${preflight.gateCode}:${preflight.cityId}:${preflight.scenarioKey}`)
+    error.preflight = preflight
+    throw error
+  }
+  if (preflight.withinLimits !== true && booleanValue(options.force) !== true) {
+    const error = new Error(`HYDROLOGY_PREFLIGHT_LIMIT_EXCEEDED:${preflight.cityId}:${preflight.scenarioKey}`)
+    error.preflight = preflight
+    throw error
+  }
+}
+
 async function runHydrologyForCity(client, cityId, options) {
   const scenarioKey = compactText(options.scenarioKey, DEFAULT_SCENARIO_KEY)
-  const sourceGridKey = await latestTerrainSourceGridKey(client, cityId, scenarioKey, options.sourceGridKey)
+  const preflight = options.preflight || await hydrologyPreflightForCity(client, cityId, options)
+  assertHydrologyPreflightCanRun(preflight, options)
+  const sourceGridKey = preflight.sourceGridKey
   const layerId = await ensureHydrologyLayer(client)
   const cellsWritten = await writeHydrologyCells(client, cityId, { scenarioKey, sourceGridKey, layerId })
   const objectObservations = await attachHydrologyObservations(client, cityId, { scenarioKey, layerId })
@@ -608,6 +760,7 @@ async function runHydrologyForCity(client, cityId, options) {
     waterEvidenceCount: evidenceCount,
   })
   return {
+    preflight,
     cityId,
     scenarioKey,
     sourceGridKey,
@@ -624,6 +777,10 @@ export async function runHydrologyGridExtractor({
   cityIds = DEFAULT_CITY_IDS,
   scenarioKey = DEFAULT_SCENARIO_KEY,
   sourceGridKey,
+  maxCells,
+  maxObjectObservations,
+  dryRun = false,
+  force = false,
 } = {}) {
   return await withClient(async (client) => {
     await client.query('BEGIN')
@@ -632,8 +789,15 @@ export async function runHydrologyGridExtractor({
       await client.query("SET LOCAL work_mem = '48MB'")
       const targetCityIds = await listCityIds(client, cityIds)
       const cities = []
+      const runOptions = { scenarioKey, sourceGridKey, maxCells, maxObjectObservations, force }
       for (const cityId of targetCityIds) {
-        cities.push(await runHydrologyForCity(client, cityId, { scenarioKey, sourceGridKey }))
+        const preflight = await hydrologyPreflightForCity(client, cityId, runOptions)
+        if (booleanValue(dryRun)) {
+          cities.push({ ...preflight, skippedWrite: true })
+          continue
+        }
+        assertHydrologyPreflightCanRun(preflight, runOptions)
+        cities.push(await runHydrologyForCity(client, cityId, { ...runOptions, preflight }))
       }
       await client.query('COMMIT')
       return {
@@ -642,6 +806,9 @@ export async function runHydrologyGridExtractor({
         layerKey: HYDROLOGY_LAYER_KEY,
         scenarioKey,
         sourceGridKey: compactText(sourceGridKey) || null,
+        dryRun: booleanValue(dryRun),
+        force: booleanValue(force),
+        limits: hydrologyLimits({ maxCells, maxObjectObservations }),
         cityCount: cities.length,
         cities,
       }
@@ -650,6 +817,20 @@ export async function runHydrologyGridExtractor({
       throw error
     }
   })
+}
+
+export async function getHydrologyGridExtractorPreflight(cityId, {
+  scenarioKey = DEFAULT_SCENARIO_KEY,
+  sourceGridKey,
+  maxCells,
+  maxObjectObservations,
+} = {}) {
+  return await withClient(async (client) => hydrologyPreflightForCity(client, cityId, {
+    scenarioKey,
+    sourceGridKey,
+    maxCells,
+    maxObjectObservations,
+  }))
 }
 
 export async function getHydrologyGridExtractorStatus(cityId, {

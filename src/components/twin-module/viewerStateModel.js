@@ -1,8 +1,8 @@
-import { createDefaultTwinQueryClause } from './semanticQueryClient'
+import { createDefaultTwinQueryClause, DEFAULT_QUERY_RADIUS_PERCENT } from './semanticQueryClient'
+export { DEFAULT_QUERY_RADIUS_PERCENT } from './semanticQueryClient'
 
 export const DEFAULT_LAYER_DETAIL = 100
 export const FIXED_DETAIL_LAYER_KEYS = new Set(['boundary', 'unclassifiedLand'])
-export const DEFAULT_QUERY_RADIUS_PERCENT = 35
 export const QUERY_IDLE_CONTEXT_LAYERS = new Set(['boundary'])
 
 export function defaultTwinQueryBuilder(supportsCityScale) {
@@ -12,6 +12,9 @@ export function defaultTwinQueryBuilder(supportsCityScale) {
     supportsCityScale,
   })
   return {
+    mode: 'builder',
+    rawText: '',
+    sqlText: '',
     operation: 'union',
     clauses: [firstClause],
     classKey: 'buildings',
@@ -22,6 +25,7 @@ export function defaultTwinQueryBuilder(supportsCityScale) {
     predicates: [
       {
         id: 'predicate-1',
+        kind: 'property',
         field: '',
         operator: 'exists',
         value: '',
@@ -29,6 +33,18 @@ export function defaultTwinQueryBuilder(supportsCityScale) {
       },
     ],
     renderMode: 'isolate',
+    subjectQuery: {
+      subject: {
+        kinds: ['context'],
+        types: [],
+        domainTypes: [],
+        privacyClasses: ['public', 'aggregate'],
+      },
+      indicator: null,
+      relation: null,
+      render: { mode: 'auto', maxFeatures: 500 },
+      limit: 500,
+    },
   }
 }
 
@@ -125,9 +141,10 @@ export function buildDefaultLayerControls(layerDefinitions = []) {
   )
 }
 
-export function buildQueryIdleVisibleLayers(layerDefinitions = []) {
+export function buildQueryIdleVisibleLayers(layerDefinitions = [], contextLayerKeys = QUERY_IDLE_CONTEXT_LAYERS) {
+  const visibleContext = new Set(contextLayerKeys || QUERY_IDLE_CONTEXT_LAYERS)
   return Object.fromEntries(
-    layerDefinitions.map((layer) => [layer.key, QUERY_IDLE_CONTEXT_LAYERS.has(layer.key)]),
+    layerDefinitions.map((layer) => [layer.key, visibleContext.has(layer.key)]),
   )
 }
 

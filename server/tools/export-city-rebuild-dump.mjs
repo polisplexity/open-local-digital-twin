@@ -17,13 +17,13 @@ const args = new Map(
 
 const cityId = String(args.get('city') ?? args.get('cityId') ?? '').trim()
 if (!cityId) {
-  console.error('Usage: npm run city:export-dump -- --city=adazi')
+  console.error('Usage: npm run city:export-dump -- --city=<city-id>')
   process.exit(1)
 }
 
 const outputRoot = path.resolve(
   args.get('output') ??
-    path.join('/home/hadox/outputs/twin-base-studio/city-dumps', `${cityId}-${new Date().toISOString().replace(/[:.]/g, '-')}`),
+    path.join(process.cwd(), 'exports', 'city-dumps', `${cityId}-${new Date().toISOString().replace(/[:.]/g, '-')}`),
 )
 
 const cityScopedTables = [
@@ -417,9 +417,9 @@ This package preserves the city-specific LDT state for ${city.rows[0].name}.
 - Tables: ${manifest.counts.tables}
 - Rows: ${manifest.counts.rows}
 
-Use this as a reconstruction source for the Latvia/Ādaži validation case while the active demo is narrowed to Kharkiv.
+Use this as a reconstruction source for a specific city validation case without coupling the active workspace to that city.
 
-It is intentionally stored outside the application repo under \`/home/hadox/outputs\`.
+Use \`--output=<path>\` to store the package outside the application repository.
 `,
     )
 

@@ -14,7 +14,8 @@ export async function refreshMvtCacheLayer(cityConfig, layerKey, body = {}) {
   const existingJobId = compact(body.existingJobId ?? body.existing_job_id)
   if (!existingJobId) throw new Error('INGESTION_JOB_ID_REQUIRED_FOR_MVT_CACHE_REFRESH')
 
-  const cityId = compact(cityConfig?.id, compact(body.cityId ?? body.city_id, 'kharkiv'))
+  const cityId = compact(cityConfig?.id, compact(body.cityId ?? body.city_id))
+  if (!cityId) throw new Error('CITY_ID_REQUIRED_FOR_MVT_CACHE_REFRESH')
   const workerId = compact(body.workerId ?? body.worker_id, 'provider-worker')
   const gridKey = compact(body.gridKey ?? body.grid_key ?? body.metadata?.gridKey, 'city-density-2km')
   const cellSizeM = body.cellSizeM ?? body.cell_size_m ?? body.metadata?.cellSizeM ?? 2000

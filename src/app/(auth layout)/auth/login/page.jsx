@@ -16,6 +16,24 @@ const accessSurfaces = [
   'Civic XR for public explanation and partner demos.',
 ]
 
+const devLoginDefaults = {
+  email: 'smoke@polisplexity.test',
+  password: 'local-smoke-password-change-me',
+  cityId: 'guanajuato',
+  rememberMe: true,
+}
+
+function getIdentityProviderLabel(provider) {
+  if (provider?.key === 'eu-toolbox-mexico') return 'organization account'
+  return provider?.name || 'external account'
+}
+
+function shouldPrefillDevLogin() {
+  if (process.env.NEXT_PUBLIC_TWIN_STUDIO_DEV_LOGIN_DEFAULTS === '0') return false
+  if (typeof window === 'undefined') return false
+  return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+}
+
 const Login = () => {
   const [userName, setUserName] = useState('')
   const [password, setPassword] = useState('')
@@ -24,10 +42,15 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [devDefaultsApplied, setDevDefaultsApplied] = useState(false)
+  const [identityProviders, setIdentityProviders] = useState([])
+  const [identityProvidersLoading, setIdentityProvidersLoading] = useState(false)
+  const [identityProvidersUnavailable, setIdentityProvidersUnavailable] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const activationSuccess = searchParams.get('activated') === '1'
   const activationError = searchParams.get('activation_error')
+  const identityProviderError = searchParams.get('oidc_error')
   const nextRoute = searchParams.get('next') || '/cockpit'
   const { activeCity, availableCities, brandName, refreshPlatformContext, setSelectedCityId, workspaceName } =
     usePlatformContext()
@@ -40,6 +63,46 @@ const Login = () => {
       return activeCity?.id ?? availableCities[0]?.id ?? ''
     })
   }, [activeCity?.id, availableCities])
+
+  useEffect(() => {
+    if (devDefaultsApplied) return undefined
+    if (shouldPrefillDevLogin()) {
+      setUserName((current) => current || devLoginDefaults.email)
+      setPassword((current) => current || devLoginDefaults.password)
+      setWorkspaceCityId((current) => current || devLoginDefaults.cityId)
+      setRememberMe(devLoginDefaults.rememberMe)
+    }
+    setDevDefaultsApplied(true)
+    return undefined
+  }, [devDefaultsApplied])
+
+  useEffect(() => {
+    let mounted = true
+    setIdentityProvidersLoading(true)
+    setIdentityProvidersUnavailable(false)
+    fetch('/api/auth/oidc/providers', { credentials: 'same-origin' })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(payload.error || `OIDC_PROVIDERS_HTTP_${response.status}`)
+        return payload
+      })
+      .then((payload) => {
+        if (!mounted) return
+        setIdentityProviders(Array.isArray(payload.providers) ? payload.providers : [])
+      })
+      .catch(() => {
+        if (!mounted) return
+        setIdentityProviders([])
+        setIdentityProvidersUnavailable(true)
+      })
+      .finally(() => {
+        if (!mounted) return
+        setIdentityProvidersLoading(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   const selectedCity = useMemo(
     () => availableCities.find((city) => city.id === workspaceCityId) ?? activeCity ?? null,
@@ -84,6 +147,12 @@ const Login = () => {
     }
   }
 
+  const handleIdentityProviderLogin = (providerKey) => {
+    const providerPath = encodeURIComponent(providerKey)
+    const nextParam = encodeURIComponent(nextRoute)
+    window.location.href = `/api/auth/oidc/${providerPath}/login?next=${nextParam}`
+  }
+
   return (
     <div className="hk-pg-wrapper pt-0 pb-xl-0 pb-5">
       <div className="hk-pg-body pt-0 pb-xl-0">
@@ -106,8 +175,8 @@ const Login = () => {
                   <Row>
                     <Col xl={8} sm={10} className="mx-auto">
                       <div className="text-center mb-4">
-                        <h4>Enter the twin workspace</h4>
-                        <p>Sign in to review the current city baseline, inspect the active logical twin, and control which municipal workspace is live.</p>
+                        <h4>Sign in to the city twin</h4>
+                        <p>Open the Guanajuato workspace with your local account or your organization account.</p>
                       </div>
                       {activationSuccess ? (
                         <Alert variant="success">
@@ -117,6 +186,16 @@ const Login = () => {
                       {activationError ? (
                         <Alert variant="warning">
                           The activation link is no longer valid. Request a new account activation or password reset.
+                        </Alert>
+                      ) : null}
+                      {identityProviderError ? (
+                        <Alert variant="warning">
+                          External sign-in could not be completed. Check the identity provider and try again.
+                        </Alert>
+                      ) : null}
+                      {identityProvidersUnavailable ? (
+                        <Alert variant="warning">
+                          Organization sign-in is temporarily unavailable. Local sign-in is still available.
                         </Alert>
                       ) : null}
                       {error ? <Alert variant="danger">{error}</Alert> : null}
@@ -192,12 +271,28 @@ const Login = () => {
                       </div>
 
                       <Button disabled={!workspaceCityId || !userName.trim() || !password.trim() || submitting} variant="primary" type="submit" className="btn-uppercase btn-block">
-                        {submitting ? 'Opening workspace…' : 'Enter Twin Base Studio'}
+                        {submitting ? 'Opening workspace…' : 'Sign in'}
                       </Button>
+                      {identityProviders.length > 0 ? (
+                        <div className="d-grid gap-2 mt-3">
+                          {identityProviders.map((provider) => (
+                            <Button
+                              className="btn-uppercase btn-block"
+                              disabled={identityProvidersLoading}
+                              key={provider.key}
+                              onClick={() => handleIdentityProviderLogin(provider.key)}
+                              type="button"
+                              variant="outline-primary"
+                            >
+                              Continue with {getIdentityProviderLabel(provider)}
+                            </Button>
+                          ))}
+                        </div>
+                      ) : null}
                       <p className="p-xs mt-3 mb-1 text-center">
                         Don&apos;t have an account yet? <Link href="/auth/signup"><u>Create one here</u></Link>
                       </p>
-                      <p className="p-xs mt-3 text-center text-muted">This light platform can later be fed by Polisplexity proper without changing the user-facing workspace.</p>
+                      <p className="p-xs mt-3 text-center text-muted">Use a local account or the configured organization login.</p>
                     </Col>
                   </Row>
                 </Form>

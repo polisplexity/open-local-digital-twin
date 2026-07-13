@@ -1,0 +1,52 @@
+{
+    "formatVersion":  1,
+    "generatedAtUtc":  "2026-07-13T11:57:51.6908305Z",
+    "publicVersion":  "0.2.0",
+    "sourceScope":  [
+                        "src",
+                        "server",
+                        "selected technical documentation"
+                    ],
+    "preservedPublicScope":  [
+                                 "license",
+                                 "governance",
+                                 "community",
+                                 "DPG evidence",
+                                 "GitHub configuration"
+                             ],
+    "excludedScope":  [
+                          "secrets",
+                          "runtime data",
+                          "private operations",
+                          "partner notes",
+                          "city-specific working papers",
+                          "deployment credentials"
+                      ],
+    "documentation":  [
+                          "ARCHITECTURE_INDEX.md",
+                          "CITY_3D_TILES_PIPELINE.md",
+                          "CONTEXT_SUBJECT_QUERY_ARCHITECTURE.md",
+                          "DATA_FACTORY_EXECUTION_PROVIDER_PLAN.md",
+                          "DATA_FACTORY_REMOTE_SERVER_CONFIGURATION.md",
+                          "DEPENDENCY_SECURITY_AUDIT_2026-07-12.md",
+                          "EU_LDT_AI_NOTEBOOK_UCS_INTEGRATION.md",
+                          "EU_LDT_CITY_INNOVATION_PLANNER_INTEGRATION.md",
+                          "EU_LDT_DATA_MODELLER_SCENARIO.md",
+                          "EU_LDT_DATA_SPACE_READY_LAB.md",
+                          "EU_LDT_TOOL_ACCEPTANCE_MATRICES.md",
+                          "EU_LDT_TOOLBOX_INTEGRATION.md",
+                          "EU_LDT_USE_CASE_SCENARIOS_INTEGRATION.md",
+                          "IDENTITY_PROVIDER_PROFILES.md",
+                          "INDICATOR_KPI_CATALOG.md",
+                          "MUNICIPAL_OPERATIONAL_WORKFLOW_STANDARD.md",
+                          "OFFLINE_DATA_FACTORY_RUNNER.md",
+                          "PROCESSING_MODES_OPENMPI.md",
+                          "SEMANTIC_LAYER_ARCHITECTURE.md",
+                          "SEMANTIC_QUERY_UI_CONTRACT.md",
+                          "TWIN_QUERY_ENGINE.md",
+                          "U4SSC_INDICATOR_QUERY_ACCEPTANCE.md",
+                          "USER_MANUAL.md",
+                          "VISUAL_TRANSPORT_POLICY.md",
+                          "WORKFLOW_ONBOARDING_PREPARATION.md"
+                      ]
+}

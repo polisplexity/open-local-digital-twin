@@ -1376,8 +1376,34 @@ export function renderCity3dRuntime({ cityId, baseEndpoint }) {
             }
           }
 
+          function currentThreeCameraState() {
+            return {
+              mode: 'three-orbit-camera',
+              position: { x: camera.position.x, y: camera.position.y, z: camera.position.z },
+              target: { x: controls.target.x, y: controls.target.y, z: controls.target.z },
+              zoom: camera.zoom,
+            }
+          }
+
+          function applyThreeCameraState(cameraState = {}) {
+            if (!cameraState || typeof cameraState !== 'object') return
+            const position = cameraState.position || {}
+            const target = cameraState.target || {}
+            if (Number.isFinite(Number(position.x)) && Number.isFinite(Number(position.y)) && Number.isFinite(Number(position.z))) {
+              camera.position.set(Number(position.x), Number(position.y), Number(position.z))
+            }
+            if (Number.isFinite(Number(target.x)) && Number.isFinite(Number(target.y)) && Number.isFinite(Number(target.z))) {
+              controls.target.set(Number(target.x), Number(target.y), Number(target.z))
+            }
+            if (Number.isFinite(Number(cameraState.zoom))) {
+              camera.zoom = Number(cameraState.zoom)
+            }
+            camera.updateProjectionMatrix()
+            controls.update()
+          }
+
           function syncState() {
-            broadcast('twin:state', { layers: visibleState })
+            broadcast('twin:state', { layers: visibleState, camera: currentThreeCameraState(), runtime: 'three' })
           }
 
           controlRoot.querySelectorAll('input[type="checkbox"]').forEach((input) => {
@@ -1439,6 +1465,15 @@ export function renderCity3dRuntime({ cityId, baseEndpoint }) {
             if (message.type === 'twin:set-fidelity') {
               updateDetailPresence(Number(message.value) || 0.62)
               applyDistanceStyling()
+            }
+
+            if (message.type === 'twin:apply-visual-state') {
+              const visualState = message.visualState || {}
+              Object.entries(visualState.layers || {}).forEach(([key, visible]) => {
+                setLayerVisibility(key, Boolean(visible))
+              })
+              applyThreeCameraState(visualState.camera)
+              syncState()
             }
 
             if (message.type === 'twin:set-semantic-query') {
