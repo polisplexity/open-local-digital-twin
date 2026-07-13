@@ -200,7 +200,7 @@
     "next": "15.5.20",
     "next-seo": "^6.8.0",
     "nodemailer": "^9.0.3",
-    "pg": "^8.20.0",
+    "pg": "^8.22.0",
     "prop-types": "^15.8.1",
     "react": "^19",
     "react-apexcharts": "^1.7.0",
