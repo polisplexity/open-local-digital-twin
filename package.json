@@ -167,7 +167,7 @@
   "dependencies": {
     "@amcharts/amcharts5": "^5.13.6",
     "@amcharts/amcharts5-geodata": "^5.1.5",
-    "@babylonjs/core": "^9.10.1",
+    "@babylonjs/core": "^9.16.1",
     "@fortawesome/fontawesome-svg-core": "^7.0.0",
     "@fortawesome/free-brands-svg-icons": "^7.0.0",
     "@fortawesome/free-solid-svg-icons": "^7.0.0",
