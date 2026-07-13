@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Scan the repository with Gitleaks
         run: >-
           docker run --rm
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Use Node.js 22
         uses: actions/setup-node@v6
         with:
@@ -71,7 +71,7 @@ jobs:
       TWIN_STUDIO_SMOKE_CITY_ID: guanajuato
     steps:
       - name: Check out source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Use Node.js 22
         uses: actions/setup-node@v6
         with:
