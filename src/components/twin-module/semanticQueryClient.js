@@ -2,11 +2,11 @@
 
 const DEFAULT_QUERY_CLASSES = ['buildings']
 const BROAD_QUERY_CLASSES = ['buildings', 'roads', 'greenBlue', 'places', 'accessSeeds']
-const DEFAULT_RADIUS_PERCENT = 35
+export const DEFAULT_QUERY_RADIUS_PERCENT = 10
 export const VIEWER_QUERY_FEATURE_BUDGETS = {
-  map: 300000,
-  '3d': 300000,
-  immersive: 300000,
+  map: 50000,
+  '3d': 0,
+  immersive: 5000,
 }
 
 export const TWIN_QUERY_CLASS_LABELS = {
@@ -32,6 +32,8 @@ export const TWIN_QUERY_FIELD_OPTIONS = [
   { key: 'building_type', label: 'Building type', type: 'text', classes: ['buildings'] },
   { key: 'height_m', label: 'Height meters', type: 'number', classes: ['buildings'] },
   { key: 'floors', label: 'Floors', type: 'number', classes: ['buildings'] },
+  { key: 'sap_score', label: 'EcoBuild SAP score', type: 'number', classes: ['buildings'] },
+  { key: 'energy_label', label: 'EcoBuild energy label', type: 'text', classes: ['buildings'] },
   { key: 'land_use_class', label: 'Land use', type: 'text', classes: ['greenBlue', 'landUseCoverageGap'] },
   { key: 'category', label: 'Category', type: 'text', classes: ['greenBlue', 'accessSeeds', 'places'] },
   { key: 'place_type', label: 'Place type', type: 'text', classes: ['places'] },
@@ -258,13 +260,13 @@ function renderForViewer(viewerId, render = {}) {
   return {
     ...render,
     mode: render.mode || 'isolate',
-    transport: transportForViewer(viewerId),
+    transport: render.transport || transportForViewer(viewerId),
     ...(maxFeatures ? { maxFeatures } : {}),
   }
 }
 
 export function transportForViewer(viewerId) {
-  if (viewerId === '3d') return 'cesium-primitives'
+  if (viewerId === '3d') return 'selection-reference'
   if (viewerId === 'immersive') return 'scene-manifest'
   return 'mvt'
 }
@@ -279,12 +281,132 @@ export function normalizeTwinQueryForViewer(query = {}, { surface = 'map', viewe
   }
 }
 
+function intentForQueryViewer(viewerId) {
+  if (viewerId === '3d') return 'operations'
+  if (viewerId === 'immersive') return 'embed'
+  return 'analysis'
+}
+
+export function parseRawTwinQueryJson(rawText = '') {
+  const text = String(rawText ?? '').trim()
+  if (!text) {
+    const error = new Error('RAW_QUERY_REQUIRED')
+    error.code = 'RAW_QUERY_REQUIRED'
+    throw error
+  }
+  let query
+  try {
+    query = JSON.parse(text)
+  } catch (cause) {
+    const error = new Error('RAW_QUERY_JSON_INVALID')
+    error.code = 'RAW_QUERY_JSON_INVALID'
+    error.cause = cause
+    throw error
+  }
+  if (!query || typeof query !== 'object' || Array.isArray(query)) {
+    const error = new Error('RAW_QUERY_OBJECT_REQUIRED')
+    error.code = 'RAW_QUERY_OBJECT_REQUIRED'
+    throw error
+  }
+  return query
+}
+
+export function buildRawTwinQueryRequest({
+  rawQuery,
+  rawText = '',
+  surface = 'map',
+  viewerId = 'map',
+} = {}) {
+  const parsedQuery = rawQuery && typeof rawQuery === 'object' && !Array.isArray(rawQuery)
+    ? rawQuery
+    : parseRawTwinQueryJson(rawText)
+  const query = {
+    ...parsedQuery,
+    language: parsedQuery.language || 'twinql-json',
+  }
+  const metadata = query.metadata && typeof query.metadata === 'object' ? query.metadata : {}
+  return {
+    ...normalizeTwinQueryForViewer(query, {
+      surface,
+      viewerId,
+      intent: intentForQueryViewer(viewerId),
+    }),
+    metadata: {
+      ...metadata,
+      source: 'visual-secondary-rail-raw-twin-query',
+      rawQuery: true,
+      previousSource: metadata.source || null,
+    },
+  }
+}
+
+export function buildSqlTwinQueryRequest({
+  presetId = '',
+  presetTitle = '',
+  sqlText = '',
+  surface = 'map',
+  viewerId = 'map',
+} = {}) {
+  const sql = String(sqlText ?? '').trim()
+  if (!sql) {
+    const error = new Error('SQL_QUERY_REQUIRED')
+    error.code = 'SQL_QUERY_REQUIRED'
+    throw error
+  }
+  const metadata = {
+    source: 'visual-secondary-rail-postgis-sql',
+    sqlQuery: true,
+    ...(presetId ? { presetId } : {}),
+    ...(presetTitle ? { presetTitle } : {}),
+  }
+  const sqlPayload = /^(select|with)\b/i.test(sql)
+    ? { sqlText: sql }
+    : { sqlWhere: sql }
+  return {
+    ...normalizeTwinQueryForViewer({
+      language: 'postgis-sql',
+      classes: BROAD_QUERY_CLASSES,
+      scope: { key: 'city' },
+      ...sqlPayload,
+      render: { mode: 'isolate' },
+      metadata,
+    }, {
+      surface,
+      viewerId,
+      intent: intentForQueryViewer(viewerId),
+    }),
+    metadata,
+  }
+}
+
+export function normalizeTwinQueryFor3dSelectionReference(query = {}, { surface = 'municipal3d', intent } = {}) {
+  const render = query.render && typeof query.render === 'object' ? query.render : {}
+  return {
+    ...query,
+    render: {
+      ...render,
+      mode: render.mode || 'highlight',
+      transport: 'selection-reference',
+      maxFeatures: 0,
+    },
+    surface,
+    intent: query.intent || intent,
+  }
+}
+
 function twinQueryScopeForBuilder({ builder = {}, cityCoverage = 0, payload } = {}) {
-  if (builder.scopeKey === 'city') return { key: 'city' }
+  if (builder.scopeKey === 'city') {
+    const center = payloadCenter(payload)
+    const radiusMeters = radiusMetersForCoverage(payload, cityCoverage || DEFAULT_QUERY_RADIUS_PERCENT)
+    if (center && radiusMeters > 0) {
+      return { key: 'radius', center, radiusMeters: Math.round(radiusMeters) }
+    }
+    return { key: 'city' }
+  }
   if (builder.scopeKey === 'radius') {
     const center = payloadCenter(payload)
     const explicitMeters = Number(builder.radiusMeters)
-    const percent = Number(builder.radiusPercent ?? cityCoverage ?? DEFAULT_RADIUS_PERCENT)
+    const percent = Number(builder.radiusPercent ?? cityCoverage ?? DEFAULT_QUERY_RADIUS_PERCENT)
     const radiusMeters = Number.isFinite(explicitMeters) && explicitMeters > 0
       ? explicitMeters
       : radiusMetersForCoverage(payload, percent)
@@ -300,7 +422,70 @@ function fieldOption(field) {
   return TWIN_QUERY_FIELD_OPTIONS.find((option) => option.key === field) ?? TWIN_QUERY_FIELD_OPTIONS[0]
 }
 
+function indicatorValueForQuery(predicate = {}) {
+  const valueKind = String(predicate.valueKind || 'numeric')
+  if (valueKind === 'boolean') {
+    return predicate.value === true || String(predicate.value).toLowerCase() === 'true'
+  }
+  if (valueKind === 'categorical') return String(predicate.value ?? '').trim()
+  return Number(predicate.value)
+}
+
+function indicatorPredicateWhere(predicate = {}) {
+  const indicatorKey = String(predicate.indicatorKey || predicate.key || '').trim()
+  if (!indicatorKey) return null
+  const operator = String(predicate.operator || 'exists')
+  const valueKind = String(predicate.valueKind || 'numeric')
+  const normalized = {
+    kind: 'indicator',
+    indicatorKey,
+    subjectMode: predicate.subjectMode === 'city' ? 'city' : 'self',
+    operator,
+    valueKind,
+    validationStatuses: Array.isArray(predicate.validationStatuses)
+      ? predicate.validationStatuses
+      : ['validated', 'lab', 'simulated'],
+    ...(Array.isArray(predicate.authorityStatuses) ? { authorityStatuses: predicate.authorityStatuses } : {}),
+    ...(predicate.scenarioKey ? { scenarioKey: predicate.scenarioKey } : {}),
+  }
+  if (operator === 'exists') return normalized
+  if (operator === 'between') {
+    return { ...normalized, value: Number(predicate.value), valueMax: Number(predicate.valueMax) }
+  }
+  if (operator === 'in') {
+    const values = Array.isArray(predicate.values)
+      ? predicate.values
+      : String(predicate.value ?? '').split(',').map((entry) => entry.trim()).filter(Boolean)
+    return { ...normalized, values }
+  }
+  return { ...normalized, value: indicatorValueForQuery(predicate) }
+}
+
+function relatedSubjectPredicateWhere(predicate = {}) {
+  const subjectTypes = Array.isArray(predicate.subjectTypes)
+    ? predicate.subjectTypes.filter(Boolean)
+    : predicate.subjectType
+      ? [predicate.subjectType]
+      : []
+  if (!subjectTypes.length) return null
+  const indicators = (Array.isArray(predicate.indicators) ? predicate.indicators : [])
+    .map((entry) => indicatorPredicateWhere({ ...entry, subjectMode: 'self' }))
+    .filter(Boolean)
+    .map(({ subjectMode, ...entry }) => entry)
+  return {
+    kind: 'related-subject',
+    subjectTypes,
+    relationMode: ['spatial', 'explicit', 'any'].includes(predicate.relationMode) ? predicate.relationMode : 'spatial',
+    ...(predicate.relationType ? { relationType: predicate.relationType } : {}),
+    privacyClasses: Array.isArray(predicate.privacyClasses) ? predicate.privacyClasses : ['public', 'aggregate'],
+    indicatorMode: predicate.indicatorMode === 'or' ? 'or' : 'and',
+    indicators,
+  }
+}
+
 function predicateWhere(predicate = {}) {
+  if (predicate.kind === 'indicator') return indicatorPredicateWhere(predicate)
+  if (predicate.kind === 'related-subject') return relatedSubjectPredicateWhere(predicate)
   const field = String(predicate.field ?? '').trim()
   if (!field) return null
   const option = fieldOption(field)
@@ -360,12 +545,13 @@ export function createDefaultTwinQueryClause({
     label,
     classKey,
     scopeKey: supportsCityScale ? 'radius' : 'city',
-    radiusPercent: supportsCityScale ? DEFAULT_RADIUS_PERCENT : 0,
+    radiusPercent: supportsCityScale ? DEFAULT_QUERY_RADIUS_PERCENT : 0,
     radiusMeters: '',
     predicateMode: 'and',
     predicates: [
       {
         id: `${id}-predicate-1`,
+        kind: 'property',
         field: '',
         operator: 'exists',
         value: '',
@@ -496,14 +682,37 @@ export function semanticQueryResultLabel(result) {
   const classKeys = Object.keys(summary.countsBySemanticClass ?? {})
   const classLabel = classKeys.length ? classKeys.join(', ') : (result?.query?.classes ?? []).join(', ')
   if (!Number.isFinite(total)) return 'No result'
+  if (result?.transport === 'table') {
+    const rowCount = Number(summary.returnedRows ?? result?.table?.rows?.length ?? returned)
+    const rowLabel = Number.isFinite(rowCount) ? rowCount.toLocaleString('en-US') : returned.toLocaleString('en-US')
+    return `${rowLabel} table ${rowCount === 1 ? 'row' : 'rows'}`
+  }
   if ((result?.transport === 'mvt' || result?.query?.render?.transport === 'mvt') && total > 0) {
     return `${total.toLocaleString('en-US')} ${classLabel || 'objects'} as tiles`
   }
   if ((result?.transport === 'scene-manifest' || result?.query?.render?.transport === 'scene-manifest') && total > 0) {
     return `${total.toLocaleString('en-US')} ${classLabel || 'objects'} in scene manifest`
   }
+  if ((result?.transport === 'selection-reference' || result?.query?.render?.transport === 'selection-reference') && total > 0) {
+    return `${total.toLocaleString('en-US')} ${classLabel || 'objects'} as selection reference`
+  }
   const countLabel = total === returned
     ? total.toLocaleString('en-US')
     : `${returned.toLocaleString('en-US')} / ${total.toLocaleString('en-US')}`
   return `${countLabel} ${classLabel || 'objects'}`
+}
+
+export function geojsonTransportNotice(result) {
+  const policy = result?.summary?.transportPolicy
+  if (!policy || policy.transport !== 'geojson') return ''
+  const returned = Number(policy.returned ?? result?.summary?.returned ?? result?.geojson?.features?.length ?? 0)
+  const total = Number(policy.resultCount ?? result?.summary?.resultCount ?? returned)
+  const limit = Number(policy.effectiveMaxFeatures ?? returned)
+  const returnedLabel = Number.isFinite(returned) ? returned.toLocaleString('en-US') : 'some'
+  const totalLabel = Number.isFinite(total) ? total.toLocaleString('en-US') : 'the available'
+  const limitLabel = Number.isFinite(limit) ? limit.toLocaleString('en-US') : 'bounded'
+  if (policy.warning) {
+    return `${policy.warning} Showing ${returnedLabel} of ${totalLabel} objects.`
+  }
+  return `GeoJSON preview is limited to ${limitLabel} features. Showing ${returnedLabel} of ${totalLabel} objects; full viewers should use MVT, PMTiles, 3D Tiles, or scene manifests.`
 }

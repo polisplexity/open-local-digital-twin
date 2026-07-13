@@ -14,7 +14,8 @@ function numericArg(name, fallback) {
 }
 
 async function main() {
-  const cityId = argValue('city', process.env.TWIN_STUDIO_E2E_CITY_ID || 'kharkiv')
+  const cityId = argValue('city', process.env.TWIN_STUDIO_E2E_CITY_ID || process.env.TWIN_STUDIO_CITY_ID || '')
+  if (!cityId) throw new Error('CITY_ID_REQUIRED: pass --city=<city-id> or set TWIN_STUDIO_CITY_ID')
   const scope = argValue('scope', 'block')
   if (scope !== 'block') {
     throw new Error(`Unsupported generated selection-unit scope: ${scope}`)

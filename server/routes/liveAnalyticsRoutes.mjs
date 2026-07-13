@@ -13,7 +13,10 @@ import {
 } from '../services/ldtEnvironmentalExtractorService.mjs'
 import { getLdtUrbanScienceReport } from '../services/ldtScienceService.mjs'
 import { getLdtSocietyReport } from '../services/ldtSocietyService.mjs'
-import { getLdtSemanticPackReport } from '../services/ldtSemanticPackService.mjs'
+import {
+  getLdtSemanticPackCatalog,
+  getLdtSemanticPackReport,
+} from '../services/ldtSemanticPackService.mjs'
 import { requireLiveAccess } from './liveRouteHelpers.mjs'
 
 async function sendAnalyticalReport(request, response, {
@@ -137,6 +140,16 @@ export function registerLiveAnalyticsRoutes(app, { requireLiveCityAccess }) {
     error: 'LDT_SOCIETY_REPORT_UNAVAILABLE',
   }))
 
+  app.get('/api/live/current/semantic-packs/catalog', (request, response) => sendSemanticPackCatalog(request, response, {
+    requireLiveCityAccess,
+    requestedCityId: 'current',
+  }))
+
+  app.get('/api/live/:cityId/semantic-packs/catalog', (request, response) => sendSemanticPackCatalog(request, response, {
+    requireLiveCityAccess,
+    requestedCityId: request.params.cityId,
+  }))
+
   app.get('/api/live/current/semantic-packs/:packKey/report', (request, response) => sendSemanticPackReport(request, response, {
     requireLiveCityAccess,
     requestedCityId: 'current',
@@ -240,6 +253,22 @@ async function sendEnvironmentalExtractorRuns(request, response, { requireLiveCi
   } catch (error) {
     response.status(404).json({
       error: 'LDT_ENVIRONMENTAL_EXTRACTOR_RUNS_UNAVAILABLE',
+      detail: String(error?.message ?? 'UNKNOWN_ERROR'),
+    })
+  }
+}
+
+async function sendSemanticPackCatalog(request, response, { requireLiveCityAccess, requestedCityId }) {
+  try {
+    const access = requireLiveAccess(request, response, requireLiveCityAccess, requestedCityId)
+    if (!access) return
+    response.json({
+      ...getLdtSemanticPackCatalog(),
+      cityId: access.cityId,
+    })
+  } catch (error) {
+    response.status(404).json({
+      error: 'LDT_SEMANTIC_PACK_CATALOG_UNAVAILABLE',
       detail: String(error?.message ?? 'UNKNOWN_ERROR'),
     })
   }

@@ -1,11 +1,13 @@
 import { getCityConfig } from '../../cityRegistry.mjs'
 import { liveBaseEndpoint, renderSharedShell } from '../viewerShellRenderer.mjs'
+import { buildViewerBaseMapCatalog, renderBaseMapSwitcher } from '../viewerContracts/baseMapCatalog.mjs'
 import { buildMapSurfaceManifest } from '../viewerContracts/mapSurfaceManifest.mjs'
 import { renderMapLibreRuntime } from '../viewerRuntimes/mapLibreRuntime.mjs'
 
 export function renderCityMapLibrePage({ cityId = 'current', embed = false } = {}) {
   const city = getCityConfig(cityId)
   const baseEndpoint = liveBaseEndpoint(cityId)
+  const baseMapCatalog = buildViewerBaseMapCatalog()
   const surfaceManifest = buildMapSurfaceManifest({
     cityId,
     mode: embed ? 'embeddedAnalyst' : 'cockpit',
@@ -74,20 +76,32 @@ export function renderCityMapLibrePage({ cityId = 'current', embed = false } = {
           min-height: 100vh;
           height: 100vh;
         }
+        body.is-embed .maplibre-stage .stage-topbar {
+          top: 12px;
+          left: 12px;
+        }
       </style>
     `,
     body: `
       <section class="grid grid--main">
         <article class="panel">
           <div class="map-stage maplibre-stage">
+            <div class="stage-topbar">
+              <span class="status-pill"><strong>Map</strong> Vector tile canvas</span>
+            </div>
             <div id="map"></div>
             <div id="tile-status" class="tile-status">Vector tiles ready</div>
+            ${renderBaseMapSwitcher(baseMapCatalog, {
+              id: 'map-basemap-switcher',
+              label: 'Map base',
+              className: 'basemap-switcher--floating basemap-switcher--map',
+            })}
           </div>
         </article>
       </section>
     `,
     embed,
     surfaceManifest,
-    scripts: renderMapLibreRuntime({ cityId, baseEndpoint, cityName: city.name, surfaceManifest }),
+    scripts: renderMapLibreRuntime({ cityId, baseEndpoint, cityName: city.name, surfaceManifest, baseMapCatalog }),
   })
 }

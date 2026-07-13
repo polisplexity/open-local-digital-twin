@@ -53,12 +53,14 @@ function buildLayerDefinition({
   }
 }
 
-function buildInventory({ city, counts, boundaryFeatureCount, areaKm2 }) {
+function buildInventory({ city, counts, boundaryFeatureCount, areaKm2, roadStats = {} }) {
   const roads = layerCount(counts, 'roads')
   const buildings = layerCount(counts, 'buildings') + layerCount(counts, 'overture-buildings')
   const greenBlue = layerCount(counts, 'greenBlue')
   const places = layerCount(counts, 'places')
   const facilities = layerCount(counts, 'facilities')
+  const roadKm = Number(roadStats.roadKm ?? 0)
+  const roadNameCount = Number(roadStats.roadNameCount ?? 0)
 
   const inventory = {
     totals: {
@@ -68,11 +70,11 @@ function buildInventory({ city, counts, boundaryFeatureCount, areaKm2 }) {
       scopeHeightKm: 0,
       unclassifiedLandAreaKm2: 0,
       unclassifiedLandPercent: 0,
-      roadsRendered: 0,
+      roadsRendered: roads,
       roadsDiscovered: roads,
-      roadNamesDiscovered: 0,
-      renderedRoadKm: 0,
-      buildingsRendered: 0,
+      roadNamesDiscovered: roadNameCount,
+      renderedRoadKm: roadKm,
+      buildingsRendered: buildings,
       buildingsDiscovered: buildings,
       buildingCandidateNew: 0,
       buildingCandidateMatched: 0,
@@ -193,6 +195,27 @@ export async function buildPostgisBasePayload(city) {
         LEFT JOIN layer_definitions ld ON ld.id = cf.layer_id
         WHERE cf.city_id = $1
         GROUP BY COALESCE(ld.key, cf.feature_type)
+      ),
+      road_stats AS (
+        SELECT
+          count(*) FILTER (
+            WHERE nullif(coalesce(
+              properties->>'name',
+              properties->>'label',
+              properties->>'roadName',
+              properties#>>'{names,primary}'
+            ), '') IS NOT NULL
+          )::int AS named_count,
+          COALESCE(sum(
+            CASE
+              WHEN GeometryType(geom) IN ('LINESTRING', 'MULTILINESTRING')
+                THEN ST_Length(geom::geography)
+              ELSE 0
+            END
+          ) / 1000.0, 0) AS road_km
+        FROM city_features
+        WHERE city_id = $1
+          AND feature_type = 'roads'
       )
       SELECT
         CASE
@@ -215,13 +238,13 @@ export async function buildPostgisBasePayload(city) {
           )
         END AS boundary,
         COALESCE(
-          (SELECT ST_X(ST_PointOnSurface(geom))::double precision FROM feature_scope WHERE geom IS NOT NULL),
           (SELECT ST_X(ST_PointOnSurface(geom))::double precision FROM latest_boundary),
+          (SELECT ST_X(ST_PointOnSurface(geom))::double precision FROM feature_scope WHERE geom IS NOT NULL),
           $3::double precision
         ) AS lon,
         COALESCE(
-          (SELECT ST_Y(ST_PointOnSurface(geom))::double precision FROM feature_scope WHERE geom IS NOT NULL),
           (SELECT ST_Y(ST_PointOnSurface(geom))::double precision FROM latest_boundary),
+          (SELECT ST_Y(ST_PointOnSurface(geom))::double precision FROM feature_scope WHERE geom IS NOT NULL),
           $4::double precision
         ) AS lat,
         COALESCE(
@@ -235,7 +258,9 @@ export async function buildPostgisBasePayload(city) {
         COALESCE(
           (SELECT jsonb_object_agg(layer_key, count) FROM feature_counts),
           '{}'::jsonb
-        ) AS counts
+        ) AS counts,
+        COALESCE((SELECT named_count FROM road_stats), 0) AS road_name_count,
+        COALESCE((SELECT road_km FROM road_stats), 0) AS road_km
     `,
     [city.id, city.name, city.center?.lon ?? 0, city.center?.lat ?? 0],
   )
@@ -252,7 +277,16 @@ export async function buildPostgisBasePayload(city) {
   const boundary = parseMaybeJson(row.boundary, emptyFeatureCollection()) ?? emptyFeatureCollection()
   const boundaryFeatureCount = boundary.features?.length ?? 0
   const areaKm2 = Number(row.area_km2 ?? 0)
-  const inventory = buildInventory({ city, counts, boundaryFeatureCount, areaKm2 })
+  const inventory = buildInventory({
+    city,
+    counts,
+    boundaryFeatureCount,
+    areaKm2,
+    roadStats: {
+      roadNameCount: Number(row.road_name_count ?? 0),
+      roadKm: Number(row.road_km ?? 0),
+    },
+  })
 
   return {
     version: PAYLOAD_SCHEMA_VERSION,

@@ -21,7 +21,7 @@ function argValue(name) {
 
 function cityIdsFromArgs() {
   const cityArg = argValue('city')
-  if (!cityArg) return ['kharkiv']
+  if (!cityArg) return ['guanajuato']
   return cityArg.split(',').map((entry) => entry.trim()).filter(Boolean)
 }
 

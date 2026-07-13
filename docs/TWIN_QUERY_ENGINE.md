@@ -1,20 +1,39 @@
 # Twin Query Engine
 
-Updated: 2026-05-24
+Updated: 2026-07-12
 
 The platform now has two query paths:
 
 - `semantic-query`: simple SDTQuery-style semantic selector for easy UI prompts.
-- `twin-query`: SQL-grade, read-only query contract that compiles safe JSON
-  predicates and multi-clause unions to parameterized PostGIS SQL.
+- `twin-query`: SQL-grade, read-only query contract. The default mode compiles
+  safe JSON predicates and multi-clause unions to parameterized PostGIS SQL.
+  The expert mode accepts either a constrained full read-only PostGIS
+  `SELECT`/`WITH` statement or a legacy `WHERE` expression over the same
+  read-only city-object views.
+- `subject-query`: governed queries over city, contextual, and physical
+  subjects, indicator observations, and typed relations. It preserves honest
+  statistical/organizational grain and returns a renderer manifest instead of
+  forcing every result into a physical-object map.
 
 The platform also has a persisted analysis-selection path. It executes the same
 TwinQL/CQL2 contract, stores the selected object IDs in `ldt_analysis`, and lets
 map, City 3D, Civic XR, embeds, APIs, and future simulations reuse the same
 working set.
 
+Subject queries use a different persistence contract because a reusable
+question is not always a set of physical object IDs. They store a blueprint,
+optional city binding, and execution manifest in
+`ldt_analysis.subject_query_*`. See
+`docs/CONTEXT_SUBJECT_QUERY_ARCHITECTURE.md`.
+
 The product rule is simple: city users should be able to ask for any meaningful
-city object, but the UI and public API must not execute raw SQL directly.
+city object. Non-technical users get the structured builder. Technical users
+can use full read-only SQL when joins, related subjects, and multiple indicator
+conditions require it.
+
+The visible product modes remain **Builder** and **SQL**. Context subjects are
+available inside Builder as related-area conditions and inside SQL through
+governed `ldt_query` views; they are not exposed as a third top-level query tab.
 
 ## Canonical Query Surface
 
@@ -132,6 +151,81 @@ The endpoint returns:
 - GeoJSON features when render mode is not `count`,
 - the query contract so clients can build forms without hard-coding fields.
 
+## Indicator And Related-Subject Conditions
+
+Builder conditions support:
+
+- allowlisted object properties;
+- indicator values attached to each object;
+- city-wide indicator values; and
+- spatially or explicitly related context subjects with nested indicator
+  predicates.
+
+Related indicators support `AND`/`OR`, and numeric, boolean, categorical, and
+ordinal comparisons. Evidence filters can restrict validation and authority
+status. The compiler emits parameterized `EXISTS` clauses over
+`ldt_query.subjects`, `ldt_query.subject_relations`, and
+`ldt_query.indicator_subject_values`.
+
+All 91 U4SSC definitions have persisted Builder/SQL acceptance presets. See
+`docs/U4SSC_INDICATOR_QUERY_ACCEPTANCE.md`.
+
+## Expert PostGIS SQL Mode
+
+The visual rail exposes two product modes:
+
+- Builder: structured class/scope/filter controls.
+- SQL: a constrained read-only full `SELECT`/`WITH` statement over governed
+  `ldt_query` views, or a plain PostGIS `WHERE` expression over
+  `ldt_query.city_objects` as alias `co`.
+
+Examples:
+
+```sql
+semantic_class = 'buildings'
+AND ST_Area(co.geom::geography) > 150
+```
+
+```sql
+semantic_class = 'roads'
+AND road_class IN ('primary', 'secondary', 'tertiary')
+```
+
+The expert mode strips an optional leading `WHERE` for the legacy expression
+path. The full-statement path accepts one read-only `SELECT` or `WITH` query and
+rejects additional statements, comments, DDL/DML verbs, writes, and
+system-catalog/function escape hatches. Geometry-heavy predicates should
+qualify the geometry column as `co.geom`.
+
+## Visual Transport Planning
+
+TwinQuery owns the working set. Viewers do not own separate data pipelines.
+Each visual surface requests a transport for the same query, and the backend
+decides how much direct payload is safe to return.
+
+- Map requests `render.transport = "mvt"` and receives query-aware tile links.
+  Large map results must stay tile-based.
+- City 3D requests `render.transport = "selection-reference"` by default. The
+  response contains counts, bounds, query hash, materialization links, and active
+  3D artifact references without returning render geometry. This keeps municipal
+  3D query work tile-backed over registered 3D Tiles instead of creating one
+  browser object per city feature.
+- City 3D can still explicitly request `render.transport = "cesium-primitives"`
+  for small previews, overlays, and compatibility tests. Direct primitive
+  payloads are capped by the TwinQuery visual transport policy and must not be
+  the product default.
+- Civic XR requests `render.transport = "scene-manifest"` for direct immersive
+  scene payloads. Scene manifests are also capped for normal product traffic;
+  larger results should become XR chunks or registered viewer artifacts.
+- Explicit capacity/stress tooling can opt into higher direct payloads with a
+  dedicated test intent. This is not the product default.
+
+The response may include `summary.transportPolicy`, for example when a direct
+3D/XR payload is capped. The policy reports requested/effective feature
+budgets, whether a limit was applied, total result count, returned count, and
+recommended next transports such as `analysis-selection`, `3d-tiles`,
+`xr-scene-chunks`, or `viewer-artifact`.
+
 For `render.transport = "scene-manifest"`, the HTTP response does not expose
 the GeoJSON working payload. It returns `sceneManifest`, a renderable Civic XR
 contract with:
@@ -163,7 +257,7 @@ still represents city objects that matched the query after a non-empty display
 geometry exists.
 
 Each execution is logged in `ldt_viewer.semantic_query_events` with
-`query_kind = twinql-json` or `cql2-json`. The events endpoint reads the same
+`query_kind = twinql-json`, `cql2-json`, or `postgis-sql`. The events endpoint reads the same
 table back for the visual rail so analysts can see and replay recent runs
 without confusing runtime query history with source data or curated embeds.
 The table is append-only product telemetry: repeated executions are preserved
@@ -330,12 +424,15 @@ part of the query produced each object family.
 Large result sets must not be rendered as one GeoJSON payload. Product viewers
 request a transport that matches the surface:
 
-- `/map`: `render.transport = "mvt"` returns a predicate-aware vector-tile
+- `/analytical-map`: `render.transport = "mvt"` returns a predicate-aware vector-tile
   template for the same TwinQL/CQL2 query.
-- `/municipal`: `render.transport = "cesium-primitives"` returns bounded
-  query primitives for Cesium. This is the current bridge until 3D Tiles is
-  promoted.
-- `/public`: `render.transport = "scene-manifest"` returns compact immersive
+- `/city-3d`: `render.transport = "selection-reference"` returns a 3D
+  reference/control payload only. The base geometry should come from registered
+  3D Tiles, and a later materialization step can persist the reference as an
+  analysis selection or query-scoped viewer artifact.
+- `/city-3d`: `render.transport = "cesium-primitives"` remains available only for
+  bounded preview primitives and compatibility tests.
+- `/civic-xr`: `render.transport = "scene-manifest"` returns compact immersive
   scene/story metadata.
 - API/export/debug: `render.transport = "geojson"` remains available by
   explicit request and as legacy default compatibility.
@@ -343,8 +440,8 @@ request a transport that matches the surface:
 Viewers should center or fit from `summary.bounds` first, then fall back to the
 query scope geometry, then to transport-specific bounds. This prevents a
 truncated or sampled visual payload from controlling the camera when the true
-query has thousands of matching city objects. It also keeps `/map`,
-`/municipal`, and `/public` aligned because all surfaces consume the same
+query has thousands of matching city objects. It also keeps `/analytical-map`,
+`/city-3d`, and `/civic-xr` aligned because all surfaces consume the same
 normalized query, counts, and bounds.
 
 ## Supported Render Modes
@@ -359,19 +456,23 @@ normalized query, counts, and bounds.
 - `metadata`: counts, bounds, and query metadata only.
 - `mvt`: query-aware vector tile template for MapLibre.
 - `cesium-primitives`: Cesium primitive payload for the municipal 3D surface.
+- `selection-reference`: no-geometry 3D selection reference with query hash,
+  counts, bounds, materialization links, and active 3D artifact links.
 - `scene-manifest`: compact immersive scene/story manifest.
 - `geojson`: explicit export, interoperability, inspection, and legacy
   compatibility mode.
 
 ## Safety Model
 
-The UI can be powerful without accepting raw SQL:
+The UI can be powerful without accepting full raw SQL:
 
 - fields are allowlisted,
 - operators are allowlisted by field type,
 - all values are bound as SQL parameters,
 - geometry scopes are normalized before execution,
 - the query surface is read-only,
+- expert SQL is limited to a single `WHERE` expression against
+  `ldt_query.city_objects co`,
 - the route records demand telemetry without exposing database internals.
 
 This gives analysts a SQL-grade query model while keeping the open-source city
@@ -439,7 +540,9 @@ route compiles the same normalized TwinQL/CQL2 query against
 `ldt_query.city_objects`, keeps semantic class, source/provenance, and
 multi-clause provenance as tile properties, and avoids sending one huge
 FeatureCollection payload to the browser. Municipal 3D uses the same normalized
-query with `cesium-primitives`; public immersive uses `scene-manifest`.
+query as a `selection-reference` over registered 3D Tiles; public immersive uses
+`scene-manifest`. `cesium-primitives` remains supported only as a bounded
+compatibility/preview transport for small 3D selections.
 
 Next hardening:
 

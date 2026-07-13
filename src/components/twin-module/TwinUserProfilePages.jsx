@@ -218,9 +218,9 @@ export function TwinProfileAccountPage() {
               </Card.Header>
               <Card.Body className="d-flex flex-wrap gap-2">
                 <Button as={Link} href="/cockpit" variant="primary">Go to cockpit</Button>
-                <Button as={Link} href="/map" variant="outline-light">Open Analytical Map</Button>
-                <Button as={Link} href="/municipal" variant="outline-light">Open City 3D</Button>
-                <Button as={Link} href="/public" variant="outline-light">Open Civic XR</Button>
+                <Button as={Link} href="/analytical-map" variant="outline-light">Open Analytical Map</Button>
+                <Button as={Link} href="/city-3d" variant="outline-light">Open City 3D</Button>
+                <Button as={Link} href="/civic-xr" variant="outline-light">Open Civic XR</Button>
                 <Button as={Link} href="/admin" variant="outline-light">Open admin review</Button>
               </Card.Body>
             </Card>

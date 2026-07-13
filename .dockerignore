@@ -10,3 +10,12 @@ runtime-data/bim-assets
 runtime-data/validation
 runtime-data/*.sqlite
 runtime-data/*.sqlite-*
+runtime-data/extracts
+runtime-data/3d-tiles
+exports
+runtime-data-guanajuato-test/extracts
+runtime-data-guanajuato-test/3d-tiles
+runtime-data-guanajuato-test/artifacts
+runtime-data-guanajuato-test/bim-assets
+runtime-data-guanajuato-test/live-cache
+runtime-data-guanajuato-test/tmp

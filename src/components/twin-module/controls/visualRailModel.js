@@ -1,20 +1,20 @@
 export const VIEWER_COPY = {
   map: {
-    title: 'Viewer controls',
+    title: 'City analysis',
     commandsTitle: 'View controls',
     bundlesTitle: 'Layer bundles',
     fidelityTitle: 'Drawing density',
     movement: 'Drag to pan. Wheel or pinch to zoom. Click a feature to inspect base, seed, and layer meaning.',
   },
   '3d': {
-    title: 'Viewer controls',
+    title: '3D inspection',
     commandsTitle: 'View controls',
     bundlesTitle: 'Layer bundles',
     fidelityTitle: '3D density',
     movement: 'Orbit, pan, and zoom the scene. Camera presets change the municipal read without changing the data.',
   },
   immersive: {
-    title: 'Viewer controls',
+    title: 'XR workspace',
     commandsTitle: 'XR controls',
     bundlesTitle: 'Layer bundles',
     fidelityTitle: 'XR scene density',

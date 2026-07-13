@@ -10,7 +10,8 @@ function argValue(name) {
   return arg ? arg.slice(prefix.length) : ''
 }
 
-const cityId = argValue('city') || 'kharkiv'
+const cityId = argValue('city') || process.env.TWIN_STUDIO_E2E_CITY_ID || process.env.TWIN_STUDIO_CITY_ID || ''
+if (!cityId) throw new Error('CITY_ID_REQUIRED: pass --city=<city-id> or set TWIN_STUDIO_CITY_ID')
 const connectionKey = argValue('connection') || 'local-dry-run'
 const brokerUrl = argValue('broker-url')
 const tenant = argValue('tenant')

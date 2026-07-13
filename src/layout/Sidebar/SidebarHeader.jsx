@@ -10,6 +10,9 @@ import logo from '@/assets/img/brand-sm.svg'
 const SidebarHeader = () => {
   const { dispatch } = useGlobalStateContext()
   const { activeCity, brandName, workspaceName } = usePlatformContext()
+  const cityName = getCityDisplayName(activeCity)
+  const workspaceSubline = getWorkspaceSubline(activeCity)
+  const locationLine = activeCity ? [cityName, workspaceSubline].filter(Boolean).join(', ') : workspaceSubline
 
   return (
     <div className="menu-header">
@@ -17,9 +20,9 @@ const SidebarHeader = () => {
         <Link className="navbar-brand dt-brand-lockup" href="/cockpit">
           <Image className="brand-img img-fluid" src={logo} alt="Twin Base Studio" />
           <span className="dt-brand-copy">
-            <small>{brandName} / {getCityDisplayName(activeCity)}</small>
+            <small>{brandName} / {cityName}</small>
             <strong>{workspaceName || getCityWorkspaceLabel(activeCity)}</strong>
-            <span>{getWorkspaceSubline(activeCity)}</span>
+            <span>{locationLine}</span>
           </span>
         </Link>
         <Button

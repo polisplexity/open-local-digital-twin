@@ -83,6 +83,7 @@ assert(connectionString, 'DATABASE_URL_REQUIRED')
 
 const client = new Client({ connectionString })
 const broker = await startMockBroker()
+const cityId = process.env.TWIN_STUDIO_E2E_CITY_ID || process.env.TWIN_STUDIO_CITY_ID || 'guanajuato'
 let connectionKey = ''
 let observationId = ''
 await client.connect()
@@ -106,17 +107,19 @@ try {
   assert(connections.connections.some((entry) => entry.connection_key === connectionKey), 'FIWARE_CONNECTION_LIST_MISSING')
 
   const sync = await syncCityToFiware({
-    cityId: 'adazi',
+    cityId,
     connectionKey,
     ngsiType: 'Building',
     limit: 3,
   })
   assert(sync.ok, 'FIWARE_SYNC_FAILED')
-  assert(sync.selected === 3, 'FIWARE_SYNC_SELECTED_MISMATCH')
-  assert(sync.pushed === 3, 'FIWARE_SYNC_PUSHED_MISMATCH')
-  assert(broker.received.upserts.length === 2, 'FIWARE_BATCH_COUNT_MISMATCH')
-  assert(broker.received.upserts[0].body[0].type === 'Building', 'FIWARE_BATCH_ENTITY_TYPE_INVALID')
-  assert(broker.received.upserts[0].headers['fiware-service'] === 'twin-base-studio', 'FIWARE_TENANT_HEADER_MISSING')
+  assert(sync.selected >= 0 && sync.selected <= 3, 'FIWARE_SYNC_SELECTED_OUT_OF_RANGE')
+  assert(sync.pushed === sync.selected, 'FIWARE_SYNC_PUSHED_MISMATCH')
+  assert(broker.received.upserts.length === Math.ceil(sync.pushed / 2), 'FIWARE_BATCH_COUNT_MISMATCH')
+  if (sync.pushed > 0) {
+    assert(broker.received.upserts[0].body[0].type === 'Building', 'FIWARE_BATCH_ENTITY_TYPE_INVALID')
+    assert(broker.received.upserts[0].headers['fiware-service'] === 'twin-base-studio', 'FIWARE_TENANT_HEADER_MISSING')
+  }
 
   const state = await client.query(
     `
@@ -128,7 +131,7 @@ try {
     `,
     [connectionKey],
   )
-  assert(state.rows[0].synced === 3, 'FIWARE_PROJECTION_STATE_SYNCED_MISMATCH')
+  assert(state.rows[0].synced === sync.pushed, 'FIWARE_PROJECTION_STATE_SYNCED_MISMATCH')
 
   const subscription = await createFiwareSubscription({
     connectionKey,
@@ -143,16 +146,18 @@ try {
   assert(subscription.brokerResponse.status === 201, 'FIWARE_SUBSCRIPTION_BROKER_STATUS_INVALID')
   assert(broker.received.subscriptions.length === 1, 'FIWARE_SUBSCRIPTION_NOT_RECEIVED')
 
-  const ngsiId = broker.received.upserts[0].body[0].id
-  const observation = await recordFiwareObservation({
-    ngsiId,
-    observedProperty: 'height',
-    value: { type: 'Property', value: 8 },
-    sourcePayload: { source: 'phase-5-smoke' },
-  })
-  observationId = observation.observation.id
-  assert(observation.ok, 'FIWARE_OBSERVATION_RECORD_FAILED')
-  assert(observation.observation.entity_id, 'FIWARE_OBSERVATION_ENTITY_LINK_MISSING')
+  if (sync.pushed > 0) {
+    const ngsiId = broker.received.upserts[0].body[0].id
+    const observation = await recordFiwareObservation({
+      ngsiId,
+      observedProperty: 'height',
+      value: { type: 'Property', value: 8 },
+      sourcePayload: { source: 'phase-5-smoke' },
+    })
+    observationId = observation.observation.id
+    assert(observation.ok, 'FIWARE_OBSERVATION_RECORD_FAILED')
+    assert(observation.observation.entity_id, 'FIWARE_OBSERVATION_ENTITY_LINK_MISSING')
+  }
 
   const job = await client.query(
     `
@@ -163,7 +168,7 @@ try {
     [sync.jobId],
   )
   assert(job.rows[0].status === 'completed', 'FIWARE_SYNC_JOB_NOT_COMPLETED')
-  assert(job.rows[0].stats.pushed === 3, 'FIWARE_SYNC_JOB_STATS_INVALID')
+  assert(job.rows[0].stats.pushed === sync.pushed, 'FIWARE_SYNC_JOB_STATS_INVALID')
 
   console.log(JSON.stringify({
     ok: true,

@@ -7,7 +7,7 @@ import {
   city3dPhenomenaRuntimeConfig,
 } from '../viewerContracts/city3dPhenomenaContract.mjs'
 
-export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
+export function renderCityCesiumRuntime({ cityId, baseEndpoint, baseMapCatalog = null }) {
   const phenomenaModes = city3dPhenomenaRuntimeConfig()
   const phenomenaCommands = city3dPhenomenaCommandMap()
   return `
@@ -26,7 +26,9 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
         const viewerId = '3d'
         const cityId = ${JSON.stringify(cityId)}
         const baseEndpoint = ${JSON.stringify(baseEndpoint)}
+        const baseMapCatalog = ${JSON.stringify(baseMapCatalog)}
         const CesiumLib = window.Cesium
+        const baseMapStorageKey = 'twin:base-map'
         const layerState = {
           boundary: true,
           roads: true,
@@ -42,19 +44,27 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
         }
         const PHENOMENA_MODES = ${JSON.stringify(phenomenaModes, null, 10)}
         const PHENOMENA_COMMANDS = ${JSON.stringify(phenomenaCommands, null, 10)}
+        const CITY3D_QUERY_INTERACTIVE_FEATURE_BUDGET = 8000
+        const CITY3D_QUERY_RENDER_BATCH_SIZE = 280
         let viewer = null
         let payload = null
         let baseDataSource = null
         let queryDataSource = null
+        let fragmentDataSources = []
         let phenomenaDataSource = null
+        let city3dTilesetPrimitives = []
+        let city3dTilesetSummary = null
         let phenomenaGrids = {}
         let phenomenaGridKeys = {}
         let phenomenaMode = 'off'
         let activeQuerySelection = null
+        let queryRenderSequence = 0
+        let queryRenderTimer = null
         let readyBroadcasted = false
         let baseImageryInstalled = false
         let baseImageryLayer = null
         let visualTheme = 'light'
+        let activeBaseMapId = initialBaseMapId()
         let sourceTerrainInstalled = false
         let sourceTerrainSamples = []
         let sourceTerrainStats = null
@@ -100,12 +110,109 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
           return PHENOMENA_MODES[mode] || null
         }
 
+        function baseMapEntries() {
+          return Array.isArray(baseMapCatalog?.entries) ? baseMapCatalog.entries : []
+        }
+
+        function baseMapById(id) {
+          return baseMapEntries().find((entry) => entry?.id === id) || null
+        }
+
+        function defaultBaseMap() {
+          return baseMapById(baseMapCatalog?.defaultId) || baseMapEntries()[0] || { id: 'clean', type: 'blank', attribution: 'Twin overlay only' }
+        }
+
+        function currentBaseMap() {
+          return baseMapById(activeBaseMapId) || defaultBaseMap()
+        }
+
+        function initialBaseMapId() {
+          try {
+            const stored = String(window.localStorage?.getItem(baseMapStorageKey) || '')
+            if (stored && baseMapById(stored)) return stored
+          } catch {}
+          return defaultBaseMap().id
+        }
+
+        function baseMapTiles(entry = currentBaseMap()) {
+          return Array.isArray(entry?.tiles) ? entry.tiles.filter(Boolean) : []
+        }
+
+        function baseMapStyle(entry = currentBaseMap()) {
+          const style = entry?.cesiumStyle || {}
+          return style[visualTheme] || style.light || {}
+        }
+
+        function baseMapAttribution(entry = currentBaseMap()) {
+          return String(entry?.attribution || 'CesiumJS')
+        }
+
+        function currentBaseMapState() {
+          const entry = currentBaseMap()
+          return {
+            id: entry.id,
+            label: entry.label || entry.shortLabel || entry.id,
+            type: entry.type || 'unknown',
+          }
+        }
+
+
+        async function loadCity3dTilesets(cityId) {
+          const response = await fetch('/api/live/' + encodeURIComponent(cityId || 'current') + '/3d-tilesets?status=ready&limit=10', {
+            credentials: 'same-origin',
+          })
+          if (!response.ok) return { tilesets: [] }
+          return response.json()
+        }
+
+        async function addCity3dTilesets() {
+          if (!CesiumLib.Cesium3DTileset) return
+          for (const primitive of city3dTilesetPrimitives) {
+            try { viewer.scene.primitives.remove(primitive) } catch {}
+          }
+          city3dTilesetPrimitives = []
+          city3dTilesetSummary = null
+          const catalog = await loadCity3dTilesets(cityId)
+          const tilesets = Array.isArray(catalog?.tilesets) ? catalog.tilesets : []
+          let loadedFeatureCount = 0
+          for (const tileset of tilesets) {
+            const url = String(tileset.tilesetUrl || tileset.tileset_url || '').trim()
+            if (!url) continue
+            try {
+              const primitive = CesiumLib.Cesium3DTileset.fromUrl
+                ? await CesiumLib.Cesium3DTileset.fromUrl(url)
+                : new CesiumLib.Cesium3DTileset({ url })
+              viewer.scene.primitives.add(primitive)
+              city3dTilesetPrimitives.push(primitive)
+              loadedFeatureCount += Math.max(0, Number(tileset.featureCount ?? tileset.objectCount ?? 0) || 0)
+            } catch (error) {
+              console.warn('City 3D Tiles package failed to load', url, error)
+            }
+          }
+          if (city3dTilesetPrimitives.length) {
+            city3dTilesetSummary = {
+              packages: city3dTilesetPrimitives.length,
+              featureCount: loadedFeatureCount,
+            }
+            const loadedLabel = loadedFeatureCount > 0
+              ? loadedFeatureCount.toLocaleString('en-US') + ' 3D Tiles features loaded'
+              : String(city3dTilesetPrimitives.length) + ' 3D Tiles package' + (city3dTilesetPrimitives.length === 1 ? '' : 's') + ' loaded'
+            setStatus(loadedLabel)
+            broadcast('twin:viewport', {
+              mode: '3d-tiles',
+              label: loadedLabel,
+              returned: loadedFeatureCount,
+              truncated: false,
+            })
+            viewer.scene.requestRender()
+          }
+        }
         async function loadPhenomenaGrid(cityId, mode = phenomenaMode, options = {}) {
           const config = phenomenaConfig(mode)
           if (!config) return featureCollection([])
           const params = new URLSearchParams({
             layerKey: config.layerKey,
-            limit: isTerrainSurfaceMode(mode) ? '50000' : '5000',
+            limit: '50000',
           })
           const scopeParams = options.query || options.selection
             ? environmentalCellScopeParams(options.query || {}, options.selection || null)
@@ -309,10 +416,17 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
           viewer.scene.backgroundColor = CesiumLib.Color.fromCssColorString(palette.background)
           viewer.scene.globe.baseColor = CesiumLib.Color.fromCssColorString(palette.globe)
           if (baseImageryLayer) {
-            baseImageryLayer.alpha = palette.imageryAlpha
-            baseImageryLayer.brightness = palette.imageryBrightness
-            baseImageryLayer.contrast = palette.imageryContrast
-            baseImageryLayer.saturation = palette.imagerySaturation
+            const imageryStyle = {
+              alpha: palette.imageryAlpha,
+              brightness: palette.imageryBrightness,
+              contrast: palette.imageryContrast,
+              saturation: palette.imagerySaturation,
+              ...baseMapStyle(),
+            }
+            baseImageryLayer.alpha = Number.isFinite(Number(imageryStyle.alpha)) ? Number(imageryStyle.alpha) : palette.imageryAlpha
+            baseImageryLayer.brightness = Number.isFinite(Number(imageryStyle.brightness)) ? Number(imageryStyle.brightness) : palette.imageryBrightness
+            baseImageryLayer.contrast = Number.isFinite(Number(imageryStyle.contrast)) ? Number(imageryStyle.contrast) : palette.imageryContrast
+            baseImageryLayer.saturation = Number.isFinite(Number(imageryStyle.saturation)) ? Number(imageryStyle.saturation) : palette.imagerySaturation
           }
           ;[baseDataSource, queryDataSource].filter(Boolean).forEach((dataSource) => {
             dataSource.entities.values.forEach(restyleEntity)
@@ -385,6 +499,10 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
           if (!geometry) return 0
           const props = { ...(feature.properties || {}), layerKey }
           const style = styleForLayer(layerKey)
+          const fillColor = options.fillColor || props.__fragmentColor || style.fill
+          const strokeColor = options.strokeColor || options.fillColor || props.__fragmentColor || style.stroke
+          const styleAlpha = options.alpha ?? style.alpha
+          const styleWidth = options.width || style.width
           const entityBase = {
             properties: props,
             layerKey,
@@ -399,8 +517,8 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
               ...entityBase,
               polyline: {
                 positions,
-                width: options.width || style.width,
-                material: color(style.stroke, options.alpha ?? style.alpha),
+                width: styleWidth,
+                material: color(strokeColor, styleAlpha),
                 clampToGround: true,
               },
             })
@@ -423,7 +541,7 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
               point: {
                 pixelSize: options.pixelSize || 7,
                 heightReference: CesiumLib.HeightReference.RELATIVE_TO_GROUND,
-                color: color(style.fill, options.alpha ?? style.alpha),
+                color: color(fillColor, styleAlpha),
                 outlineColor: CesiumLib.Color.WHITE.withAlpha(0.85),
                 outlineWidth: 1,
                 disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -457,9 +575,9 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
                 heightReference: CesiumLib.HeightReference.CLAMP_TO_GROUND,
                 extrudedHeight: isBuilding && !forceFlatBuilding ? heightModel.height : undefined,
                 extrudedHeightReference: isBuilding && !forceFlatBuilding ? CesiumLib.HeightReference.RELATIVE_TO_GROUND : undefined,
-                material: color(style.fill, options.alpha ?? (forceFlatBuilding ? 0.12 : isEstimatedBuilding ? 0.34 : style.alpha)),
+                material: color(fillColor, options.alpha ?? (forceFlatBuilding ? 0.12 : isEstimatedBuilding ? 0.34 : style.alpha)),
                 outline: true,
-                outlineColor: color(style.stroke, forceFlatBuilding ? 0.86 : isEstimatedBuilding ? 0.62 : 0.95),
+                outlineColor: color(strokeColor, forceFlatBuilding ? 0.86 : isEstimatedBuilding ? 0.62 : 0.95),
                 closeTop: !forceFlatBuilding,
                 closeBottom: !forceFlatBuilding,
               },
@@ -1415,6 +1533,7 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
               : 'query-scope-cell-overlay'
           broadcast('twin:state', {
             layers: layerState,
+            baseMap: currentBaseMapState(),
             phenomena: {
               mode: phenomenaMode,
               gridCells: rendered,
@@ -1501,6 +1620,7 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
           viewer.dataSources.add(baseDataSource)
           addBoundary(baseDataSource)
           await addBimLayers(baseDataSource)
+          await addCity3dTilesets()
           applySceneVisualTheme()
           if (options.fit !== false) {
             fitToPayload(payload, { animate: false, startup: true })
@@ -1508,25 +1628,157 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
         }
 
         ${renderCityCesiumQuerySelectionRuntime()}
-        function city3dImageryTemplate() {
-          return window.TWIN_CITY3D_IMAGERY_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+
+        function removeFragmentDataSources() {
+          if (!viewer?.dataSources) {
+            fragmentDataSources = []
+            return
+          }
+          const staleSources = []
+          for (let index = 0; index < viewer.dataSources.length; index += 1) {
+            const dataSource = viewer.dataSources.get(index)
+            if (String(dataSource?.name || '').startsWith('fragment-workspace:')) staleSources.push(dataSource)
+          }
+          staleSources.forEach((dataSource) => viewer.dataSources.remove(dataSource, true))
+          fragmentDataSources = []
         }
 
-        function installBaseImagery() {
-          if (baseImageryInstalled) return
-          const template = city3dImageryTemplate()
-          if (!template || !CesiumLib.UrlTemplateImageryProvider) return
+        function clearFragmentWorkspace() {
+          removeFragmentDataSources()
+          setStatus('Fragment layer cleared')
+          broadcast('twin:viewport', {
+            mode: 'fragment-workspace-cleared',
+            label: 'Fragment layer cleared',
+            returned: 0,
+            truncated: false,
+          })
+          viewer?.scene?.requestRender()
+        }
+
+        function applyFragmentWorkspace(message = {}) {
+          if (!viewer?.dataSources) return
+          removeFragmentDataSources()
+          const fragments = Array.isArray(message.fragments) ? message.fragments : []
+          const opacity = Math.min(1, Math.max(0.1, Number(message.options?.opacity ?? 0.78)))
+          let rendered = 0
+          let combinedBounds = null
+          fragments.forEach((fragment, index) => {
+            const dataSource = new CesiumLib.CustomDataSource('fragment-workspace:' + String(fragment.id || index))
+            viewer.dataSources.add(dataSource)
+            fragmentDataSources.push(dataSource)
+            const geojson = fragment.geojson || featureCollection([])
+            const primitiveFeatures = getPrimitiveFeatures(fragment.primitives)
+            const features = primitiveFeatures.length
+              ? primitiveFeatures.map(featureFromPrimitive).filter(Boolean)
+              : getFeatures(geojson)
+            combinedBounds = expandBounds(
+              combinedBounds,
+              primitiveFeatures.length ? boundsFromPrimitives(fragment.primitives) : boundsFromGeojson(geojson),
+            )
+            features.forEach((feature) => {
+              const layerKey = layerKeyForFeature(feature)
+              const featureColor = feature.properties?.__fragmentColor || fragment.color || '#007c89'
+              rendered += addGeometry(dataSource, feature, layerKey, {
+                alpha: opacity,
+                fillColor: featureColor,
+                strokeColor: featureColor,
+                width: layerKey === 'roads' ? 3.2 : 2,
+              })
+            })
+          })
+          const total = Number(message.summary?.total ?? rendered)
+          const label = String(rendered.toLocaleString('en-US')) + ' fragment features' + (total > rendered ? ' / ' + String(total.toLocaleString('en-US')) + ' total' : '')
+          setStatus(label)
+          broadcast('twin:viewport', {
+            mode: 'fragment-workspace',
+            label,
+            returned: rendered,
+            resultCount: total,
+            truncated: Boolean(message.summary?.truncated || total > rendered),
+          })
+          const bounds = padBounds(combinedBounds, 0.08)
+          if (bounds) {
+            moveCameraToBounds(bounds, {
+              headingDegrees: 34,
+              pitchDegrees: -48,
+              rangeMultiplier: 1.18,
+              minRange: 1100,
+            })
+          }
+          viewer.scene.requestRender()
+        }
+
+        function removeBaseImagery() {
+          if (!viewer || !baseImageryLayer) return
+          try { viewer.imageryLayers.remove(baseImageryLayer, true) } catch {}
+          baseImageryLayer = null
+          baseImageryInstalled = false
+        }
+
+        function updateSceneAttribution(entry = currentBaseMap()) {
+          const attribution = document.getElementById('scene-attribution')
+          if (!attribution) return
+          attribution.textContent = entry?.type === 'blank'
+            ? 'Twin overlay only | CesiumJS'
+            : baseMapAttribution(entry) + ' | CesiumJS'
+        }
+
+        function installBaseImagery(entry = currentBaseMap()) {
+          if (!viewer) return
+          removeBaseImagery()
+          if (entry?.type !== 'raster' || !baseMapTiles(entry).length || !CesiumLib.UrlTemplateImageryProvider) {
+            updateSceneAttribution(entry)
+            applySceneVisualTheme()
+            viewer.scene.requestRender()
+            return
+          }
+          const template = baseMapTiles(entry)[0]
           const provider = new CesiumLib.UrlTemplateImageryProvider({
             url: template,
-            credit: '© OpenStreetMap contributors',
-            maximumLevel: 19,
+            credit: baseMapAttribution(entry),
+            maximumLevel: Number(entry?.maximumLevel) || 19,
             tilingScheme: new CesiumLib.WebMercatorTilingScheme(),
           })
-          baseImageryLayer = viewer.imageryLayers.addImageryProvider(provider)
+          baseImageryLayer = viewer.imageryLayers.addImageryProvider(provider, 0)
           baseImageryInstalled = true
           applySceneVisualTheme()
-          const attribution = document.getElementById('scene-attribution')
-          if (attribution) attribution.textContent = '© OpenStreetMap contributors | CesiumJS'
+          updateSceneAttribution(entry)
+          viewer.scene.requestRender()
+        }
+
+        function updateBaseMapButtons() {
+          document.documentElement.setAttribute('data-basemap', currentBaseMap().id)
+          document.body?.setAttribute('data-basemap', currentBaseMap().id)
+          document.querySelectorAll('[data-basemap]').forEach((button) => {
+            const active = button.getAttribute('data-basemap') === currentBaseMap().id
+            button.setAttribute('aria-pressed', active ? 'true' : 'false')
+          })
+        }
+
+        function setBaseMap(nextId, { persist = true, broadcastState = true } = {}) {
+          const entry = baseMapById(nextId) || defaultBaseMap()
+          activeBaseMapId = entry.id
+          if (persist) {
+            try { window.localStorage?.setItem(baseMapStorageKey, activeBaseMapId) } catch {}
+          }
+          installBaseImagery(entry)
+          updateBaseMapButtons()
+          if (broadcastState) {
+            broadcast('twin:state', {
+              layers: layerState,
+              baseMap: currentBaseMapState(),
+              runtime: 'cesium',
+            })
+          }
+        }
+
+        function installBaseMapSwitcher() {
+          updateBaseMapButtons()
+          document.querySelectorAll('[data-basemap]').forEach((button) => {
+            button.addEventListener('click', () => {
+              setBaseMap(button.getAttribute('data-basemap') || baseMapCatalog?.defaultId)
+            })
+          })
         }
 
         function initializeViewer() {
@@ -1555,6 +1807,7 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
           if (viewer.scene.skyBox) viewer.scene.skyBox.show = false
           viewer.cesiumWidget.creditContainer.style.display = 'none'
           installBaseImagery()
+          installBaseMapSwitcher()
           watchSceneVisualTheme()
           configureUrbanCameraControls()
           installStableCameraInteractions()
@@ -1601,11 +1854,20 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
             if (Object.prototype.hasOwnProperty.call(message.layers || {}, 'spatialPhenomena')) {
               renderPhenomenaLayer({ fit: false })
             }
-            broadcast('twin:state', { layers: layerState })
+            broadcast('twin:state', { layers: layerState, baseMap: currentBaseMapState(), runtime: 'cesium' })
             if (shouldRefreshBimContext) {
               renderBaseContext({ fit: false }).catch(() => viewer?.scene?.requestRender())
             } else {
               viewer?.scene?.requestRender()
+            }
+          }
+          if (message.type === 'twin:apply-visual-state') {
+            const visualState = message.visualState || {}
+            if (visualState.baseMap?.id) {
+              setBaseMap(visualState.baseMap.id, { persist: true, broadcastState: false })
+            }
+            if (visualState.camera) {
+              setBoundedCameraView(visualState.camera, { broadcast: true })
             }
           }
           if (message.type === 'twin:set-semantic-query') {
@@ -1613,6 +1875,12 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
           }
           if (message.type === 'twin:clear-semantic-query') {
             clearQuerySelection()
+          }
+          if (message.type === 'twin:set-fragment-workspace') {
+            applyFragmentWorkspace(message)
+          }
+          if (message.type === 'twin:clear-fragment-workspace') {
+            clearFragmentWorkspace()
           }
           if (message.type === 'twin:set-phenomena-mode') {
             queuePhenomenaMode(message.mode || message.value)
@@ -1653,9 +1921,9 @@ export function renderCityCesiumRuntime({ cityId, baseEndpoint }) {
           bindPhenomenaControls()
           await setPhenomenaMode(phenomenaMode)
           readyBroadcasted = true
-          setStatus('Ready for query')
-          broadcast('twin:ready', { layers: layerState, runtime: 'cesium' })
-          broadcast('twin:state', { layers: layerState, runtime: 'cesium' })
+          if (!city3dTilesetSummary) setStatus('Ready for query')
+          broadcast('twin:ready', { layers: layerState, baseMap: currentBaseMapState(), runtime: 'cesium' })
+          broadcast('twin:state', { layers: layerState, baseMap: currentBaseMapState(), runtime: 'cesium' })
           await applyInitialSharedQuery()
         }
 

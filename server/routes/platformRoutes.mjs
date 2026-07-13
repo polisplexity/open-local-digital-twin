@@ -11,8 +11,12 @@ function buildPlatformPayload(request) {
     auth.authenticated && !isAdmin
       ? registry.cities.filter((city) => city.enabled !== false && allowedCityIds.includes(city.id))
       : registry.cities.filter((city) => city.enabled !== false)
-  const activeCityId = currentSession?.session?.cityId || registry.activeCityId
-  const activeCity = registry.cities.find((city) => city.id === activeCityId) ?? getActiveCityConfig()
+  const requestedActiveCityId = currentSession?.session?.cityId || registry.activeCityId
+  const activeCity =
+    visibleCities.find((city) => city.id === requestedActiveCityId) ??
+    visibleCities.find((city) => city.id === registry.activeCityId) ??
+    getActiveCityConfig()
+  const activeCityId = activeCity?.id ?? registry.activeCityId
 
   return {
     workspaceName: 'Twin Base Studio',

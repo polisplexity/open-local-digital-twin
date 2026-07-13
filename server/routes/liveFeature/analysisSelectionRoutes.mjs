@@ -42,6 +42,9 @@ function listOptions(request) {
 function memberOptions(request) {
   return {
     includeMembers: request.query.includeMembers === '1' || request.query.includeMembers === 'true',
+    includeSemanticContext: request.query.includeSemanticContext === '1' || request.query.includeSemanticContext === 'true',
+    semanticContextLimit: request.query.semanticContextLimit ?? request.query.contextLimit,
+    ruleCheckLimit: request.query.ruleCheckLimit,
     limit: request.query.limit,
     offset: request.query.offset,
   }

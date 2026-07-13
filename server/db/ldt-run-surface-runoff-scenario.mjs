@@ -3,8 +3,6 @@ import {
   runSurfaceRunoffScenario,
 } from '../services/ldtSurfaceRunoffScenarioService.mjs'
 
-const DEFAULT_CITY_IDS = ['kharkiv']
-
 function argValue(name) {
   const prefix = `--${name}=`
   const arg = process.argv.find((entry) => entry.startsWith(prefix))
@@ -14,7 +12,7 @@ function argValue(name) {
 function cityIdsFromArgs() {
   if (process.argv.includes('--all')) return []
   const cityArg = argValue('city')
-  if (!cityArg) return DEFAULT_CITY_IDS
+  if (!cityArg) throw new Error('SURFACE_RUNOFF_CITY_REQUIRED: pass --city=<city-id> or --all')
   return cityArg.split(',').map((entry) => entry.trim()).filter(Boolean)
 }
 

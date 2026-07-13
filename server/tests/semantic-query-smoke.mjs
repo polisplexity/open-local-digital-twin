@@ -36,7 +36,7 @@ const contract = buildSemanticQueryContract({
   layerCapabilities: layerCapabilities.layers ?? [],
 })
 
-for (const classKey of ['buildings', 'roads', 'greenBlue', 'accessSeeds']) {
+for (const classKey of ['builtFabric', 'mobilityNetwork', 'greenBlue', 'civicServices']) {
   assert(
     contract.classes.some((semanticClass) => semanticClass.key === classKey),
     `SEMANTIC_CLASS_MISSING:${classKey}`,
@@ -44,7 +44,7 @@ for (const classKey of ['buildings', 'roads', 'greenBlue', 'accessSeeds']) {
 }
 
 const cityQuery = await runCitySemanticQuery(city.id, {
-  classes: ['buildings', 'roads'],
+  classes: ['builtFabric', 'mobilityNetwork'],
   scope: { key: 'city' },
   filters: [],
   render: { mode: 'isolate', maxFeatures: 50 },
@@ -63,8 +63,27 @@ assert(
   'CITY_QUERY_FEATURE_SEMANTICS_MISSING',
 )
 
+const legacyAliasQuery = await runCitySemanticQuery(city.id, {
+  classes: ['buildings', 'roads'],
+  scope: { key: 'city' },
+  filters: [],
+  render: { mode: 'count', maxFeatures: 0 },
+  surface: 'map',
+  intent: 'analysis',
+  actorUserId: 'semantic-query-smoke',
+})
+
+assert(legacyAliasQuery.ok, `LEGACY_ALIAS_QUERY_FAILED:${legacyAliasQuery.error ?? 'unknown'}`)
+assert(
+  JSON.stringify(legacyAliasQuery.query.classes) === JSON.stringify(['builtFabric', 'mobilityNetwork']),
+  'LEGACY_ALIAS_QUERY_NOT_CANONICAL_NORMALIZED',
+)
+assert(legacyAliasQuery.summary.resultCount > 0, 'LEGACY_ALIAS_QUERY_EMPTY')
+assert(legacyAliasQuery.summary.countsBySemanticClass.builtFabric > 0, 'LEGACY_ALIAS_BUILT_FABRIC_MISSING')
+assert(legacyAliasQuery.summary.countsBySemanticClass.mobilityNetwork > 0, 'LEGACY_ALIAS_MOBILITY_MISSING')
+
 const radiusQuery = await runCitySemanticQuery(city.id, {
-  classes: ['buildings', 'roads', 'greenBlue', 'accessSeeds'],
+  classes: ['builtFabric', 'mobilityNetwork', 'greenBlue', 'civicServices'],
   scope: {
     key: 'radius',
     center: [Number(city.lon), Number(city.lat)],
@@ -83,7 +102,7 @@ assert(radiusQuery.summary.returned > 0, 'RADIUS_QUERY_RETURNED_EMPTY')
 assert(radiusQuery.query.scope.key === 'radius', 'RADIUS_QUERY_SCOPE_NOT_NORMALIZED')
 
 const roadNameQuery = await runCitySemanticQuery(city.id, {
-  classes: ['roads'],
+  classes: ['mobilityNetwork'],
   scope: { key: 'city' },
   filters: [{ field: 'roadClass', operator: 'exists', value: true }],
   render: { mode: 'isolate', maxFeatures: 25 },
@@ -107,6 +126,11 @@ console.log(JSON.stringify({
     returned: cityQuery.summary.returned,
     truncated: cityQuery.summary.truncated,
     countsBySemanticClass: cityQuery.summary.countsBySemanticClass,
+  },
+  legacyAliasQuery: {
+    resultCount: legacyAliasQuery.summary.resultCount,
+    normalizedClasses: legacyAliasQuery.query.classes,
+    countsBySemanticClass: legacyAliasQuery.summary.countsBySemanticClass,
   },
   radiusQuery: {
     resultCount: radiusQuery.summary.resultCount,

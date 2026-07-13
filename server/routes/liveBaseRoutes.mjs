@@ -36,11 +36,4 @@ export function registerLiveBaseRoutes(app, { requireLiveCityAccess, requireAdmi
     requireAdminRefreshAccess,
     requestedCityId: request.params.cityId,
   }))
-
-  app.get('/api/live/adazi/base', (request, response) => sendBasePayload(request, response, {
-    requireLiveCityAccess,
-    requireAdminRefreshAccess,
-    requestedCityId: 'adazi',
-    payloadCityId: 'adazi',
-  }))
 }

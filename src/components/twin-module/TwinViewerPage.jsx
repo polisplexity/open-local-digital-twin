@@ -12,21 +12,41 @@ import CockpitMapInspector from './panels/CockpitMapInspector'
 import VisualSurfaceContractStrip from './panels/VisualSurfaceContractStrip'
 import { useTwinQueryController } from './query/useTwinQueryController'
 import {
+  routeForQuerySurface,
+  writeQueryPassport,
+} from './query/queryPassportModel'
+import { visualStateFromShare } from './query/queryShareModel'
+import {
+  buildFragmentQueryRequest,
+  combineFragmentGeojson,
+  enrichFragmentGeojson,
+  fragmentWorkspaceSummary,
+  numericRangeForResults,
+} from './fragmentWorkspaceModel'
+import {
   buildCityAnalystIndicators,
   buildDefaultLayerControls,
   buildFallbackLayerDefinitions,
   buildHeroMetrics,
   buildQueryIdleVisibleLayers,
-  buildVisibleBundles,
   cityFeatureLimitForCoverage,
-  countVisibleSelected,
+  DEFAULT_QUERY_RADIUS_PERCENT,
   formatCount,
+  intentForViewer,
   mergeLayerState,
   payloadCenter,
   radiusMetersForCityCoverage,
   setBuildingGroupVisibility,
   surfaceKeyForViewer,
 } from './viewerStateModel'
+
+const initialFragmentWorkspaceState = () => ({
+  error: '',
+  fragments: [],
+  results: [],
+  status: 'idle',
+  summary: null,
+})
 
 const TwinViewerPage = ({ config, bundles = [] }) => {
   const iframeRef = useRef(null)
@@ -58,9 +78,49 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
   const [fidelity, setFidelity] = useState(config.defaultFidelity ?? 60)
   const [cityCoverage, setCityCoverage] = useState(0)
   const [cityScaleRevision, setCityScaleRevision] = useState(0)
-  const [selectedBundleId, setSelectedBundleId] = useState(config.defaultBundleId ?? '')
   const [layerRevision, setLayerRevision] = useState(0)
   const [activeXrMode, setActiveXrMode] = useState('walk')
+  const [viewerRuntimeState, setViewerRuntimeState] = useState({
+    camera: null,
+    cameraPolicy: null,
+    baseMap: null,
+    xrSession: null,
+    layers: {},
+    mode: '',
+    updatedAt: '',
+  })
+  const [fragmentWorkspaceState, setFragmentWorkspaceState] = useState(initialFragmentWorkspaceState)
+  const [simulationWorldState, setSimulationWorldState] = useState({
+    error: '',
+    status: 'idle',
+    worlds: [],
+  })
+
+  const visualStateSnapshot = useMemo(() => ({
+    ...viewerRuntimeState,
+    surface: surfaceKey,
+    viewerId: config.viewerId,
+    xrMode: config.viewerId === 'immersive' ? activeXrMode : viewerRuntimeState.mode,
+    layers: Object.keys(viewerRuntimeState.layers || {}).length ? viewerRuntimeState.layers : visibleLayers,
+    viewerConfig: {
+      cityCoverage,
+      fidelity,
+      layerControls,
+      supportsCityScale: Boolean(config.supportsCityScale),
+      supportsFidelity: Boolean(config.supportsFidelity),
+    },
+  }), [
+    activeXrMode,
+    cityCoverage,
+    config.supportsCityScale,
+    config.supportsFidelity,
+    config.viewerId,
+    fidelity,
+    layerControls,
+    surfaceKey,
+    viewerRuntimeState,
+    visibleLayers,
+  ])
 
   const postToViewer = useCallback((message) => {
     const target = iframeRef.current?.contentWindow
@@ -77,24 +137,32 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
 
   const {
     queryBuilder: twinQueryBuilder,
+    queryDataSpace,
     queryError,
+    queryExport,
     queryHistory,
+    queryPresets,
     queryResult,
     querySelections,
     queryShares,
     queryStatus,
+    applyQueryPreset: handleTwinQueryPresetApply,
     changeQueryBuilder: handleTwinQueryBuilderChange,
     clearQuery: handleSemanticQueryClear,
+    exportQuery: handleTwinQueryExport,
     loadAnalysisSelections: loadTwinAnalysisSelections,
+    loadDataSpaceProfiles: loadTwinDataSpaceProfiles,
     loadQueryHistory: loadTwinQueryHistory,
     loadQueryShares: loadTwinQueryShares,
     publishQueryShare: handleTwinQuerySharePublish,
+    publishQueryToDataSpace: handleTwinQueryDataSpacePublish,
     replayQuery: handleTwinQueryReplay,
     replayQueryShare: handleTwinQueryShareReplay,
     resetQuery: resetTwinQuery,
     runQuery: handleTwinQuerySubmit,
     saveAnalysisSelection: handleTwinAnalysisSelectionSave,
     saveQueryShare: handleTwinQueryShareSave,
+    buildCurrentQueryRequest: buildCurrentQueryRequest,
   } = useTwinQueryController({
     cityCoverage,
     cityId,
@@ -106,7 +174,32 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
     surfaceKey,
     twinQueryContract: visualContract.contract?.twinQueryContract,
     viewerId: config.viewerId,
+    visualState: visualStateSnapshot,
   })
+
+  const loadSimulationWorlds = useCallback(async () => {
+    setSimulationWorldState((current) => ({ ...current, error: '', status: 'loading' }))
+    try {
+      const response = await fetch(`/api/live/${encodeURIComponent(cityId)}/simulation-worlds?limit=40`, {
+        credentials: 'same-origin',
+      })
+      const result = await response.json()
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || result?.detail || `SIMULATION_WORLDS_${response.status}`)
+      }
+      setSimulationWorldState({ error: '', status: 'ready', worlds: result.worlds || [] })
+    } catch (loadError) {
+      setSimulationWorldState({
+        error: String(loadError?.message ?? 'SIMULATION_WORLDS_UNAVAILABLE'),
+        status: 'error',
+        worlds: [],
+      })
+    }
+  }, [cityId])
+
+  useEffect(() => {
+    loadSimulationWorlds()
+  }, [loadSimulationWorlds])
 
   const layerDefinitions = useMemo(() => buildFallbackLayerDefinitions(payload), [payload])
 
@@ -158,10 +251,12 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
         setSelectedAreaError('')
         setSelectedAreaLoading(false)
         resetTwinQuery()
+        setFragmentWorkspaceState(initialFragmentWorkspaceState())
         setGeometryLoading(false)
         setViewportInfo(null)
         const nextLayerDefinitions = buildFallbackLayerDefinitions(nextPayload)
-        const defaultBundle = buildVisibleBundles(bundles, nextLayerDefinitions)
+        const defaultBundle = bundles
+          .filter((bundle) => Array.isArray(bundle.layers) && bundle.layers.length)
           .find((bundle) => bundle.id === config.defaultBundleId)
         const bundleVisibleLayers =
           defaultBundle?.layers?.length
@@ -172,15 +267,14 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
                 nextLayerDefinitions.map((layer) => [layer.key, Boolean(layer.visibleByDefault)]),
         )
         const nextVisibleLayers = queryDrivenInitialView
-          ? buildQueryIdleVisibleLayers(nextLayerDefinitions)
+          ? buildQueryIdleVisibleLayers(nextLayerDefinitions, config.queryIdleLayers)
           : defaultBundle?.id === 'building-coverage'
             ? setBuildingGroupVisibility(bundleVisibleLayers, true)
             : bundleVisibleLayers
         setVisibleLayers(nextVisibleLayers)
-        setSelectedBundleId(queryDrivenInitialView ? '' : (defaultBundle?.id ?? ''))
         setLayerRevision((current) => current + 1)
         const initialCoverage = config.supportsCityScale
-          ? Number(config.defaultCityCoverage ?? (queryDrivenInitialView ? 0 : 35))
+          ? Number(config.defaultCityCoverage ?? (queryDrivenInitialView ? 0 : DEFAULT_QUERY_RADIUS_PERCENT))
           : 0
         setLayerControls(
           config.supportsCityScale
@@ -217,6 +311,7 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
     config.defaultBundleId,
     config.defaultCityCoverage,
     config.defaultFidelity,
+    config.queryIdleLayers,
     config.routeKey,
     config.supportsCityScale,
     isAnalyticalMap,
@@ -242,10 +337,22 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
         }
       }
 
-      if (message.type === 'twin:state' && message.layers) {
-        setVisibleLayers((current) =>
-          Object.keys(current).length ? current : mergeLayerState(current, message.layers),
-        )
+      if (message.type === 'twin:state') {
+        if (message.layers) {
+          setVisibleLayers((current) =>
+            Object.keys(current).length ? current : mergeLayerState(current, message.layers),
+          )
+        }
+        setViewerRuntimeState((current) => ({
+          ...current,
+          ...(message.layers && typeof message.layers === 'object' ? { layers: message.layers } : {}),
+          ...(message.camera && typeof message.camera === 'object' ? { camera: message.camera } : {}),
+          ...(message.cameraPolicy && typeof message.cameraPolicy === 'object' ? { cameraPolicy: message.cameraPolicy } : {}),
+          ...(message.baseMap && typeof message.baseMap === 'object' ? { baseMap: message.baseMap } : {}),
+          ...(message.xrSession && typeof message.xrSession === 'object' ? { xrSession: message.xrSession } : {}),
+          mode: message.mode || message.xrMode || current.mode,
+          updatedAt: new Date().toISOString(),
+        }))
       }
 
       if (message.type === 'twin:viewport-loading') {
@@ -282,7 +389,7 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
   useEffect(() => {
     if (!payload || !layerDefinitions.length || Object.keys(visibleLayers).length) return
     if (queryDrivenInitialView) {
-      setVisibleLayers(buildQueryIdleVisibleLayers(layerDefinitions))
+      setVisibleLayers(buildQueryIdleVisibleLayers(layerDefinitions, config.queryIdleLayers))
       return
     }
     const fallbackVisibleLayers = Object.fromEntries(
@@ -293,7 +400,7 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
       return
     }
     setVisibleLayers(fallbackVisibleLayers)
-  }, [config.defaultBundleId, layerDefinitions, payload, queryDrivenInitialView, visibleLayers])
+  }, [config.defaultBundleId, config.queryIdleLayers, layerDefinitions, payload, queryDrivenInitialView, visibleLayers])
 
   useEffect(() => {
     if (!iframeLoaded) return
@@ -427,74 +534,294 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
     }
   }, [cityCoverage, cityId, config.supportsCityScale, payload, refreshIndex])
 
-  const handleCityCoverageChange = (value) => {
-    const nextCoverage = Math.min(100, Math.max(0, Number(value) || 0))
-    if (iframeLoaded && config.supportsCityScale) {
-      setGeometryLoading(nextCoverage > 0)
+  const postSavedVisualStateToViewer = useCallback((visualState, delay = 0) => {
+    if (!visualState || typeof visualState !== 'object') return
+    const viewerConfig = visualState.viewerConfig && typeof visualState.viewerConfig === 'object'
+      ? visualState.viewerConfig
+      : {}
+    const layers = visualState.layers && typeof visualState.layers === 'object' ? visualState.layers : null
+    const controls = viewerConfig.layerControls && typeof viewerConfig.layerControls === 'object'
+      ? viewerConfig.layerControls
+      : null
+    const send = () => {
+      postToViewer({ type: 'twin:apply-visual-state', visualState })
+      if (layers) {
+        postToViewer({
+          type: 'twin:set-visible-layers',
+          revision: Date.now(),
+          layers,
+        })
+      }
+      if (controls) {
+        postToViewer({
+          type: 'twin:set-layer-controls',
+          controls,
+        })
+      }
+      if (config.supportsFidelity && Number.isFinite(Number(viewerConfig.fidelity))) {
+        const nextFidelity = Number(viewerConfig.fidelity)
+        postToViewer({
+          type: 'twin:set-fidelity',
+          value: nextFidelity / 100,
+          fidelity: nextFidelity / 100,
+        })
+      }
+      if (config.supportsCityScale && Number.isFinite(Number(viewerConfig.cityCoverage))) {
+        const nextCoverage = Math.min(100, Math.max(0, Number(viewerConfig.cityCoverage)))
+        postToViewer({
+          type: 'twin:set-city-scale',
+          scale: {
+            key: 'coverage',
+            coveragePercent: nextCoverage,
+            featureLimit: cityFeatureLimitForCoverage(nextCoverage),
+            fidelity: (config.defaultFidelity ?? 58) / 100,
+            revision: Date.now(),
+          },
+        })
+      }
+      const nextXrMode = visualState.xrMode || visualState.mode
+      if (config.viewerId === 'immersive' && nextXrMode) {
+        postToViewer({
+          type: 'twin:set-xr-mode',
+          mode: nextXrMode,
+          value: nextXrMode,
+        })
+      }
     }
-    setCityScaleRevision((current) => current + 1)
-    setCityCoverage(nextCoverage)
-  }
+    if (delay > 0) window.setTimeout(send, delay)
+    else send()
+  }, [config.defaultFidelity, config.supportsCityScale, config.supportsFidelity, config.viewerId, postToViewer])
 
-  const handleBundleSelect = (bundle) => {
-    if (!bundle?.layers?.length) return
-    setSelectedBundleId(bundle.id)
-    setLayerRevision((current) => current + 1)
-    const nextVisibleLayers = Object.fromEntries(
-      layerDefinitions.map((layer) => [layer.key, bundle.layers.includes(layer.key)]),
-    )
-    setVisibleLayers(
-      bundle.id === 'building-coverage'
-        ? setBuildingGroupVisibility(nextVisibleLayers, true)
-        : nextVisibleLayers,
-    )
-  }
+  const applySavedVisualState = useCallback((share, options = {}) => {
+    const visualState = visualStateFromShare(share)
+    if (!visualState || typeof visualState !== 'object') return
+    const viewerConfig = visualState.viewerConfig && typeof visualState.viewerConfig === 'object'
+      ? visualState.viewerConfig
+      : {}
+    if (visualState.layers && typeof visualState.layers === 'object') {
+      setVisibleLayers(visualState.layers)
+      setLayerRevision((current) => current + 1)
+    }
+    if (viewerConfig.layerControls && typeof viewerConfig.layerControls === 'object') {
+      setLayerControls(viewerConfig.layerControls)
+    }
+    if (Number.isFinite(Number(viewerConfig.fidelity))) {
+      setFidelity(Math.min(100, Math.max(0, Number(viewerConfig.fidelity))))
+    }
+    if (Number.isFinite(Number(viewerConfig.cityCoverage))) {
+      setCityCoverage(Math.min(100, Math.max(0, Number(viewerConfig.cityCoverage))))
+      setCityScaleRevision((current) => current + 1)
+    }
+    const nextXrMode = visualState.xrMode || visualState.mode
+    if (config.viewerId === 'immersive' && nextXrMode) {
+      setActiveXrMode(nextXrMode)
+    }
+    setViewerRuntimeState((current) => ({
+      ...current,
+      ...(visualState.camera ? { camera: visualState.camera } : {}),
+      ...(visualState.cameraPolicy ? { cameraPolicy: visualState.cameraPolicy } : {}),
+      ...(visualState.baseMap ? { baseMap: visualState.baseMap } : {}),
+      ...(visualState.xrSession ? { xrSession: visualState.xrSession } : {}),
+      ...(visualState.layers ? { layers: visualState.layers } : {}),
+      mode: visualState.mode || visualState.xrMode || current.mode,
+      updatedAt: new Date().toISOString(),
+    }))
+    if (options.post !== false) {
+      postSavedVisualStateToViewer(visualState, options.delay || 0)
+    }
+  }, [config.viewerId, postSavedVisualStateToViewer])
 
-  const handleLayerToggle = (layerKey) => {
-    setSelectedBundleId('')
-    setLayerRevision((current) => current + 1)
-    if (layerKey === 'buildings') {
-      setVisibleLayers((current) => {
-        const nextVisible = !current.buildings
-        return setBuildingGroupVisibility(current, nextVisible)
+  const handleTwinQueryShareReplayWithVisualState = useCallback(async (share) => {
+    applySavedVisualState(share, { post: true })
+    await handleTwinQueryShareReplay(share)
+    applySavedVisualState(share, { post: true, delay: 80 })
+    applySavedVisualState(share, { post: true, delay: 420 })
+  }, [applySavedVisualState, handleTwinQueryShareReplay])
+
+  const handleOpenQuerySurface = useCallback((targetViewer) => {
+    const href = routeForQuerySurface(targetViewer)
+    if (!href) return
+    let query = queryResult?.query || null
+    try {
+      query = query || buildCurrentQueryRequest?.()
+    } catch {
+      query = queryResult?.query || null
+    }
+    if (query) {
+      writeQueryPassport({
+        builder: twinQueryBuilder,
+        cityId,
+        query,
+        queryResult,
+        sourceViewer: config.viewerId,
+        targetViewer,
       })
+    }
+    window.location.assign(`${href}?queryPassport=1`)
+  }, [
+    buildCurrentQueryRequest,
+    cityId,
+    config.viewerId,
+    queryResult,
+    twinQueryBuilder,
+  ])
+
+  const handleFragmentWorkspaceCommand = useCallback(async (command = {}) => {
+    if (command.action === 'clear') {
+      setFragmentWorkspaceState(initialFragmentWorkspaceState())
+      postToViewer({ type: 'twin:clear-fragment-workspace' })
       return
     }
-    setVisibleLayers((current) => ({ ...current, [layerKey]: !current[layerKey] }))
-  }
 
-  const handleLayerSolo = (layerKey) => {
-    setSelectedBundleId('')
-    setLayerRevision((current) => current + 1)
-    setVisibleLayers(Object.fromEntries(layerDefinitions.map((layer) => [layer.key, layer.key === layerKey])))
-  }
+    const fragments = Array.isArray(command.fragments)
+      ? command.fragments.filter((fragment) => (
+        fragment?.query || fragment?.simulationRunId || fragment?.selectionSetId
+      ))
+      : []
+    if (!fragments.length) return
 
-  const handleLayerFocus = (layerKey) => {
-    postToViewer({
-      type: 'twin:command',
-      command: {
-        id: `focus-${layerKey}`,
-        kind: 'layerFocus',
-        value: layerKey,
-      },
+    const options = command.options && typeof command.options === 'object' ? command.options : {}
+    const colorBy = String(options.colorBy || '__fragment')
+    const opacity = Math.min(1, Math.max(0.1, Number(options.opacity ?? 0.78)))
+
+    setFragmentWorkspaceState({
+      error: '',
+      fragments,
+      results: [],
+      status: 'running',
+      summary: null,
     })
-  }
 
-  const handleLayerControlChange = (layerKey, patch) => {
-    setLayerControls((current) => ({
-      ...current,
-      [layerKey]: {
-        detail: 100,
-        labels: false,
-        ...(current[layerKey] ?? {}),
-        ...patch,
-      },
-    }))
-  }
+    try {
+      const rawResults = await Promise.all(fragments.map(async (fragment, index) => {
+        if (fragment.simulationRunId || fragment.selectionSetId) {
+          const endpoint = fragment.simulationRunId
+            ? `/api/live/${encodeURIComponent(cityId)}/simulation-worlds/${encodeURIComponent(fragment.simulationRunId)}/geojson`
+            : `/api/live/${encodeURIComponent(cityId)}/analysis-selections/${encodeURIComponent(fragment.selectionSetId)}/geojson`
+          const response = await fetch(endpoint, { credentials: 'same-origin' })
+          const result = await response.json()
+          if (!response.ok || !result?.ok) {
+            throw new Error(result?.error || result?.detail || `WORLD_GEOJSON_${response.status}`)
+          }
+          return {
+            fragment: {
+              ...fragment,
+              color: fragment.color || undefined,
+            },
+            index,
+            links: {},
+            primitives: null,
+            query: fragment.query || null,
+            rawGeojson: result.geojson?.features ? result.geojson : { type: 'FeatureCollection', features: [] },
+            sceneManifest: null,
+            summary: result.summary || {},
+            transport: 'geojson',
+            vectorTileTemplate: '',
+          }
+        }
+        const requestPayload = buildFragmentQueryRequest(fragment, {
+          intent: intentForViewer(config.viewerId),
+          surface: surfaceKey,
+          viewerId: config.viewerId,
+        })
+        const response = await fetch(`/api/live/${cityId}/twin-query`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestPayload),
+        })
+        const result = await response.json()
+        if (!response.ok || !result?.ok) {
+          throw new Error(result?.error || result?.detail || `FRAGMENT_QUERY_${response.status}`)
+        }
+        return {
+          fragment: {
+            ...fragment,
+            color: fragment.color || undefined,
+          },
+          index,
+          links: result.links && typeof result.links === 'object' ? result.links : {},
+          primitives: result.primitives || null,
+          query: result.query || requestPayload,
+          rawGeojson: result.geojson?.features ? result.geojson : { type: 'FeatureCollection', features: [] },
+          sceneManifest: result.sceneManifest || null,
+          summary: result.summary || {},
+          transport: result.transport || result.query?.render?.transport || requestPayload.render?.transport || '',
+          vectorTileTemplate: result.links?.vectorTileTemplate || result.vectorTileTemplate || '',
+        }
+      }))
+
+      const numericRange = numericRangeForResults(rawResults, colorBy)
+      const results = rawResults.map((entry) => ({
+        ...entry,
+        geojson: entry.rawGeojson?.features?.length
+          ? enrichFragmentGeojson({
+              colorBy,
+              fragment: entry.fragment,
+              geojson: entry.rawGeojson,
+              index: entry.index,
+              numericRange,
+            })
+          : null,
+      }))
+      const summary = fragmentWorkspaceSummary(results)
+      const combinedGeojson = combineFragmentGeojson(results)
+      const workspacePayload = {
+        type: 'twin:set-fragment-workspace',
+        fragments: results.map((entry) => ({
+          color: entry.fragment.color,
+          id: entry.fragment.id,
+          index: entry.index,
+          links: entry.links,
+          ...(entry.geojson ? { geojson: entry.geojson } : {}),
+          ...(entry.primitives ? { primitives: entry.primitives } : {}),
+          query: entry.query,
+          ...(entry.sceneManifest ? { sceneManifest: entry.sceneManifest } : {}),
+          source: entry.fragment.source,
+          summary: entry.summary,
+          title: entry.fragment.title,
+          transport: entry.transport,
+          ...(entry.vectorTileTemplate ? { vectorTileTemplate: entry.vectorTileTemplate } : {}),
+        })),
+        options: {
+          colorBy,
+          opacity,
+        },
+        summary,
+        ...(combinedGeojson ? { combinedGeojson } : {}),
+      }
+      postToViewer(workspacePayload)
+      setFragmentWorkspaceState({
+        error: '',
+        fragments,
+        results,
+        status: 'ready',
+        summary,
+      })
+    } catch (error) {
+      const message = String(error?.message ?? 'FRAGMENT_WORKSPACE_FAILED')
+      setFragmentWorkspaceState({
+        error: message,
+        fragments,
+        results: [],
+        status: 'error',
+        summary: null,
+      })
+    }
+  }, [cityId, config.viewerId, postToViewer, surfaceKey])
 
   const handleCommand = (command) => {
+    if (command?.kind === 'fragmentWorkspace') {
+      handleFragmentWorkspaceCommand(command)
+      return
+    }
     if (command?.kind === 'xrExperience') {
       setActiveXrMode(command.value)
+      setViewerRuntimeState((current) => ({
+        ...current,
+        mode: command.value,
+        updatedAt: new Date().toISOString(),
+      }))
       postToViewer({
         type: 'twin:set-xr-mode',
         mode: command.value,
@@ -515,12 +842,7 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
     () => (payload ? buildCityAnalystIndicators(payload, buildingCoverage) : []),
     [buildingCoverage, payload],
   )
-  const visibleBundles = useMemo(
-    () => buildVisibleBundles(bundles, layerDefinitions),
-    [bundles, layerDefinitions],
-  )
   const visibleLayerCount = layerDefinitions.filter((layer) => visibleLayers[layer.key]).length
-  const visibleRendered = countVisibleSelected(layerDefinitions, visibleLayers, layerControls)
   const stageReady = config.viewerId === 'map'
     ? !loading
     : viewerReady && !loading
@@ -538,6 +860,8 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
         ? `Visible ${viewportNoun} needs retry`
       : viewportInfo?.mode === 'tiles'
         ? viewportInfo.label || 'Vector tiles active'
+      : ['3d-tiles', 'semantic-query-reference'].includes(viewportInfo?.mode)
+        ? viewportInfo.label || '3D Tiles active'
       : viewportInfo
         ? `${formatCount(viewportInfo.returned)} features in view${viewportInfo.truncated ? ' +' : ''}`
         : cityCoverage > 0
@@ -588,57 +912,46 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
         <TwinControlSidebar
           activeXrMode={activeXrMode}
           body={config.controlBody}
-          bundleDefinitions={visibleBundles}
           cityCoverage={cityCoverage}
           commands={isAnalyticalMap ? [] : config.commands}
-          fidelity={fidelity}
-          fidelityHint={config.fidelityHint}
-          fidelityLabel={config.fidelityLabel}
-          layerDefinitions={layerDefinitions}
-          layerControls={layerControls}
           onCommand={handleCommand}
-          onCityCoverageChange={handleCityCoverageChange}
-          onFidelityChange={setFidelity}
-          onLayerControlChange={handleLayerControlChange}
-          onLayerFocus={handleLayerFocus}
-          onLayerSolo={handleLayerSolo}
-          onLayerToggle={handleLayerToggle}
           onQueryBuilderChange={handleTwinQueryBuilderChange}
           onQueryClear={handleSemanticQueryClear}
+          onQueryDataSpaceProfilesLoad={loadTwinDataSpaceProfiles}
+          onQueryDataSpacePublish={handleTwinQueryDataSpacePublish}
+          onQueryExport={handleTwinQueryExport}
           onQueryHistoryRefresh={loadTwinQueryHistory}
+          onQueryPresetApply={handleTwinQueryPresetApply}
           onQueryRun={handleTwinQuerySubmit}
           onQuerySharePublish={handleTwinQuerySharePublish}
           onQueryShareRefresh={loadTwinQueryShares}
-          onQueryShareReplay={handleTwinQueryShareReplay}
+          onQueryShareReplay={handleTwinQueryShareReplayWithVisualState}
           onQueryShareSave={handleTwinQueryShareSave}
           onQueryReplay={handleTwinQueryReplay}
           onQuerySelectionRefresh={loadTwinAnalysisSelections}
+          onSimulationWorldRefresh={loadSimulationWorlds}
           onQuerySelectionSave={handleTwinAnalysisSelectionSave}
-          onBundleSelect={handleBundleSelect}
+          onOpenQuerySurface={handleOpenQuerySurface}
           sections={config.sections}
           selection={selection}
-          selectedBundleId={selectedBundleId}
-          selectedAreaError={selectedAreaError}
-          selectedAreaLoading={selectedAreaLoading}
-          selectedAreaSummary={selectedAreaSummary}
-          selectionUnits={visualContract.contract?.selectionUnits}
-          surfaceManifest={visualContract.contract?.manifest}
-          supportsFidelity={Boolean(config.supportsFidelity)}
           supportsCityScale={Boolean(config.supportsCityScale)}
           title={config.controlTitle}
           queryBuilder={twinQueryBuilder}
           queryContract={visualContract.contract?.twinQueryContract}
+          queryDataSpace={queryDataSpace}
           queryError={queryError}
+          queryExport={queryExport}
           queryHistory={queryHistory}
+          queryPresets={queryPresets}
           queryResult={queryResult}
           querySelections={querySelections}
           queryShares={queryShares}
           queryStatus={queryStatus}
+          fragmentWorkspaceState={fragmentWorkspaceState}
+          simulationWorlds={simulationWorldState}
           viewerId={config.viewerId}
           viewerReady={viewerReady}
           visibleLayerCount={visibleLayerCount}
-          visibleLayers={visibleLayers}
-          visibleRendered={visibleRendered}
         />
         <div className="invoiceapp-content">
           <div className="invoiceapp-detail-wrap">
@@ -754,7 +1067,7 @@ const TwinViewerPage = ({ config, bundles = [] }) => {
                 <Col xl={6} id={isAnalyticalMap ? config.sections[3]?.id : config.sections[2]?.id}>
                   <Card className="card-border h-100">
                     <Card.Header>
-                      <h6 className="mb-0">{isAnalyticalMap ? 'Next institutional move' : config.routeKey === 'municipal' ? 'Immediate municipal decisions' : 'Public benefit'}</h6>
+                      <h6 className="mb-0">{isAnalyticalMap ? 'Next institutional move' : config.routeKey === 'city3d' ? 'Immediate municipal decisions' : 'Public benefit'}</h6>
                     </Card.Header>
                     <Card.Body className="dt-bullet-stack">
                       {(config.content.next || config.content.decisions || config.content.benefits || []).map((item) => (

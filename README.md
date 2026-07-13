@@ -1,225 +1,172 @@
 # Open Local Digital Twin
 
-Open Local Digital Twin is the public/open runtime extracted from the
-Polisplexity Twin Base Studio work. It helps cities, universities, civic labs,
-and public-interest technology teams build a local digital twin from public
-data, preserve source evidence, attach provider or authority layers, and expose
-standards-native city intelligence services.
+Open Local Digital Twin (OLDT) is a self-hosted city digital twin runtime for
+public-data baselines, governed city knowledge, spatial and contextual queries,
+standards-based exchange, model outputs, and reusable municipal workflows.
 
-The project is designed for practical Local Digital Twin adoption: start with a
-public-data baseline, keep provenance explicit, connect additional layers
-through stable APIs, and publish interoperable outputs through open standards.
+It is the open runtime behind Polisplexity's Twin Base Studio work. Cities,
+universities, civic labs, and public-interest technology teams can run it
+standalone, connect their own identity and data services, and add optional EU
+Local Digital Twin Toolbox integrations without surrendering the canonical city
+record to an external platform.
 
-## What This Runtime Provides
+## Try And Inspect
 
-- A self-hosted Node.js / Next.js / Express application server.
-- A PostgreSQL/PostGIS city twin store.
-- Public-data ingestion workflows for city baselines.
-- Separation between source evidence, consolidated inventory, inferred layers,
-  provider layers, and city-authoritative layers.
-- APIs for viewport features, vector tiles, twin queries, semantic packs, and
-  city summaries.
-- Standards-oriented exports and projections including DCAT, OGC API Features,
-  NGSI-LD, and FIWARE-compatible workflows.
-- Provider ingestion contracts for GeoJSON, CSV, OGC API Features/WFS, STAC,
-  CityJSON, IFC/BIM metadata, Shapefile, and GeoPackage workflows.
-- Privacy-aware aggregate social, cultural, environmental, and urban-science
-  reporting patterns.
+- Source: <https://github.com/polisplexity/open-local-digital-twin>
+- Hosted demo endpoint: <https://twin.polisplexity.tech>
+- User manual: [docs/USER_MANUAL.md](./docs/USER_MANUAL.md)
+- Public installation guide:
+  [docs/OPEN_SOURCE_INSTALLATION_GUIDE.md](./docs/OPEN_SOURCE_INSTALLATION_GUIDE.md)
 
-## Why It Exists
+The hosted demo and the source release have independent availability. A local
+installation remains the reproducible acceptance path.
 
-Most city digital twins fail before they become useful because they mix raw
-source data, vendor layers, official city truth, dashboards, and operational
-claims into one opaque system. Open Local Digital Twin takes a stricter public
-infrastructure posture:
+## Native Capabilities
 
-- open data is source evidence, not automatic truth;
-- authority decisions are explicit and auditable;
-- private or provider data stays separate from public baselines;
-- city-scale rendering uses PostGIS, vector tiles, and bounded payloads;
-- interoperability is generated from the city inventory instead of being bolted
-  on later;
-- no personal microdata is required for the public baseline.
+- Node.js, Next.js, and Express application runtime.
+- PostgreSQL/PostGIS canonical city store with versioned migrations.
+- Public-data ingestion, provenance, consolidation, and semantic promotion.
+- TwinQL Builder, CQL2-style filters, and guarded read-only SQL.
+- Physical city entities plus contextual subjects, observations, relations,
+  cohorts, administrative areas, and scenario worlds.
+- Saved queries, query passports, reusable selections, and export manifests.
+- MapLibre 2D, Cesium 3D, Civic XR, and Canvas comparison surfaces.
+- Provider-neutral indicator and KPI catalogs, governed observations,
+  thresholds, readiness checks, and U4SSC compatibility.
+- Local, same-server, remote, offline, HPC, and cloud Data Factory handoffs.
+- DCAT, NGSI-LD, OGC API Features, GeoJSON, CityJSON, and model-output
+  interoperability paths.
+- Standalone local authentication plus configurable OIDC identity providers.
 
-## Intended Public-Good Boundary
+## EU LDT Toolbox Compatibility
 
-This repository is the open local digital twin runtime and methodology. It does
-not include private Polisplexity deployments, customer credentials, internal
-operations, private city data, server secrets, or commercial support materials.
+OLDT uses instance profiles instead of hardcoded laboratory URLs. A profile
+selects a local, municipal, national, cloud, or partner deployment and keeps
+credentials outside source control.
 
-Polisplexity may maintain private deployments, paid services, hosted operations,
-or proprietary extensions separately. Those private components are not required
-to use the open runtime.
+The 2026 local compatibility laboratory installed the complete 12-tool EU LDT
+Toolbox bundle and exercised bounded end-to-end scenarios against OLDT. Nine
+tools have an accepted OLDT scenario path; Integrated Environment was evaluated
+as a launcher; Participate and Federated Learning remain explicit future direct
+integrations.
 
-## Ownership
+| EU LDT tool | Current OLDT boundary |
+| --- | --- |
+| Identity Management | OIDC discovery, signed-token validation, role/city mapping, callback, logout, and standalone regression |
+| Data Platform | Bidirectional NGSI-LD publish/readback through selectable profiles |
+| Play & Visualise | OLDT selections registered and consumed as 2D/3D visual layers |
+| Marketplace | Multiple configurable agents, offer publication, discovery, and download isolation |
+| Data Modeller | Governed schema, generated fixture, and OLDT result import cycle |
+| Data Space Ready | EDC-style package publication and consumer transfer evidence |
+| City Innovation Planner | KPI measurement, initiative linkage, U4SSC catalog, and OLDT query reuse |
+| Use Cases & Scenarios | Baseline/intervention orchestration and persisted scenario worlds |
+| AI Notebook | Named KServe inference reached through the accepted UCS workflow |
+| Integrated Environment | Evaluated launcher; no supported arbitrary-app registration API was found |
+| Participate | Future privacy-governed participatory asset round trip |
+| Federated Learning | Future model-training boundary through AI Notebook/Flower |
 
-Open Local Digital Twin is owned and maintained by Polisplexity Ltd. Hadox
-Research Labs and Nodo Guanajuato A.C. contribute research, civic technology,
-and public-interest methodology around the open local digital twin direction.
+These are laboratory acceptance results, not certification of an external EU
+service or authorization for production municipal decisions. See:
 
-See [OWNERSHIP.md](./OWNERSHIP.md).
+- [EU LDT integration boundary](./docs/EU_LDT_TOOLBOX_INTEGRATION.md)
+- [Case-level acceptance matrices](./docs/EU_LDT_TOOL_ACCEPTANCE_MATRICES.md)
+- [Identity provider profiles](./docs/IDENTITY_PROVIDER_PROFILES.md)
+- [AI Notebook and UCS scenario](./docs/EU_LDT_AI_NOTEBOOK_UCS_INTEGRATION.md)
 
-## License
+## Data And Governance Model
 
-The code in this repository is licensed under the Apache License 2.0.
+OLDT keeps distinct layers for source evidence, canonical entities, inferred
+semantics, provider results, model/scenario outputs, and city-authoritative
+decisions. External outputs do not silently become city truth. Promotion is an
+explicit, auditable action.
 
-See [LICENSE](./LICENSE).
+The contextual subject architecture avoids forcing every indicator onto a
+building or road. Population cohorts, service areas, administrative zones,
+events, organizations, and scenarios remain queryable first-class subjects and
+can still be joined spatially or relationally to physical entities.
 
-Documentation is also made available under the Apache License 2.0 unless a
-file states otherwise.
+- [Context subject query architecture](./docs/CONTEXT_SUBJECT_QUERY_ARCHITECTURE.md)
+- [Indicator and KPI catalog](./docs/INDICATOR_KPI_CATALOG.md)
+- [U4SSC query acceptance](./docs/U4SSC_INDICATOR_QUERY_ACCEPTANCE.md)
+- [Twin query engine](./docs/TWIN_QUERY_ENGINE.md)
 
-## Digital Public Good Readiness
+## Quick Start
 
-This repository is being prepared for Digital Public Goods Alliance review as a
-digital public good candidate. The current public-good claim is not that every
-private Polisplexity deployment is open. The claim is that this runtime,
-documentation, standards model, and public-data methodology can be reused by
-cities and public-interest teams.
+Requirements:
 
-See [DPG_READINESS.md](./DPG_READINESS.md).
-
-## Privacy And Do No Harm
-
-The default public-data baseline does not require personal microdata. The data
-model keeps open sources, provider layers, and authority layers separate, and
-the society/culture layer is designed around aggregate observations and
-privacy posture metadata.
-
-See [PRIVACY.md](./PRIVACY.md) and [DO_NO_HARM.md](./DO_NO_HARM.md).
-
-## Community And Security
-
-- [Security Policy](./SECURITY.md)
-- [Contributing Guide](./CONTRIBUTING.md)
-- [Code of Conduct](./CODE_OF_CONDUCT.md)
-
-## Install
+- Docker Engine with Compose, or Node.js 22 plus PostgreSQL/PostGIS 16.
+- At least 8 GB RAM for the basic local stack. City-scale ingestion and heavy
+  model workflows need separate capacity planning.
 
 ```bash
 git clone https://github.com/polisplexity/open-local-digital-twin.git
 cd open-local-digital-twin
-npm ci
 cp .env.example .env
-```
-
-Required environment variables for a normal PostGIS deployment:
-
-```bash
-TWIN_STUDIO_DATABASE_URL=postgresql://user:password@host:5432/open_local_digital_twin
-TWIN_STUDIO_SESSION_SECRET=<long-random-secret>
-```
-
-Run migrations:
-
-```bash
-npm run db:migrate
-npm run test:ldt-schema-smoke
-```
-
-Run locally:
-
-```bash
-npm run dev
-```
-
-Run with Docker Compose:
-
-```bash
 docker compose up -d --build
 curl -fsS http://127.0.0.1:4192/api/health
 ```
 
-## Build A Public-Data City Baseline
-
-For a supported city profile:
+For a direct Node.js installation:
 
 ```bash
-npm run db:ldt:reingest-open -- --city=<city-id>
-npm run db:ldt:consolidate -- --city=<city-id>
-npm run db:ldt:generate-interop -- --city=<city-id>
-npm run db:ldt:refresh-viewer-aggregates -- --city=<city-id> --cell-size-m=2000
-npm run db:ldt:generate-urban-science -- --city=<city-id>
-npm run db:ldt:generate-society -- --city=<city-id>
-npm run db:ldt:generate-semantic-packs -- --city=<city-id>
+npm ci
+npm run security:audit
+npm run db:migrate
+npm run build
+npm run dev
 ```
 
-Validate:
-
-```bash
-npm run test:ldt-reingest-smoke -- --city=<city-id>
-npm run test:ldt-consolidation-smoke -- --city=<city-id>
-npm run test:ldt-interop-smoke -- --city=<city-id>
-npm run test:ldt-viewer-aggregates-smoke -- --city=<city-id>
-npm run test:ldt-urban-science-smoke -- --city=<city-id>
-npm run test:ldt-society-smoke -- --city=<city-id>
-npm run test:ldt-semantic-packs-smoke -- --city=<city-id>
-```
-
-## Main API Surface
-
-Viewer/runtime:
+Set at minimum:
 
 ```text
-GET  /api/live/:cityId/base
-GET  /api/live/:cityId/features?bbox=minLon,minLat,maxLon,maxLat&layers=buildings,roads
-GET  /api/live/:cityId/tiles/:z/:x/:y.mvt
-GET  /api/live/:cityId/layer-capabilities
-GET  /api/live/:cityId/viewer-summary
-GET  /api/live/:cityId/density-grid
-GET  /api/live/:cityId/science/urban-report
-GET  /api/live/:cityId/society/report
-GET  /api/live/:cityId/twin-query-contract
-POST /api/live/:cityId/twin-query
+TWIN_STUDIO_DATABASE_URL=postgresql://user:password@host:5432/open_local_digital_twin
+TWIN_STUDIO_AUTH_SECRET=<long-random-secret>
+TWIN_STUDIO_ADMIN_EMAILS=<comma-separated-admin-emails>
 ```
 
-Standards:
+The Compose file contains development-only defaults. Replace every password,
+token, signing secret, and administrator list before any shared deployment.
+
+## Main API Families
 
 ```text
-GET /api/live/:cityId/standards/dcat
-GET /api/live/:cityId/standards/ngsi-ld/entities
-GET /api/live/:cityId/standards/ogc
-GET /api/live/:cityId/standards/ogc/collections
-GET /api/live/:cityId/standards/ogc/collections/:collectionKey/items
+/api/live/:cityId/*                    City, query, viewer, and standards APIs
+/api/admin/*                           Governed workflows and operator controls
+/api/provider/v1/*                     Provider ingestion and observations
+/api/auth/*                            Local and OIDC authentication
+/api/admin/eu-ldt/*                    Configurable EU LDT integration profiles
+/api/live/:cityId/subjects/*           Context subject query APIs
+/api/live/:cityId/world-comparisons/*  Reality and scenario comparison
 ```
 
-Provider handoff:
+The complete route and workflow guidance is maintained in the
+[user manual](./docs/USER_MANUAL.md) and
+[architecture index](./docs/ARCHITECTURE_INDEX.md).
 
-```text
-GET  /api/provider/v1/status
-POST /api/provider/v1/cities/:cityId/layers/:layerKey/upload-intents
-POST /api/provider/v1/cities/:cityId/layers/:layerKey/jobs
-POST /api/provider/v1/fiware/observations
-```
+## Public Export Boundary
 
-## Documentation
+This repository is generated through a repeatable allowlisted export. It does
+not contain private deployments, runtime databases, city/provider private data,
+credentials, internal operations, partner notes, or commercial support
+materials. The export is independently scanned, installed, audited, built, and
+tested before publication.
 
-- [Open Source Installation Guide](./docs/OPEN_SOURCE_INSTALLATION_GUIDE.md)
-- [Open Source Production Flow](./docs/OPEN_SOURCE_PRODUCTION_FLOW.md)
-- [Product Architecture](./docs/PRODUCT_ARCHITECTURE.md)
-- [LDT Native Standards Architecture](./docs/LDT_NATIVE_STANDARDS_ARCHITECTURE.md)
-- [Provider Connector Contract](./docs/PROVIDER_CONNECTOR_CONTRACT.md)
-- [Semantic Pack Standard](./docs/SEMANTIC_PACK_STANDARD.md)
-- [Society and Culture Standard](./docs/SOCIETY_CULTURE_STANDARD.md)
-- [Urban Science Standard](./docs/URBAN_SCIENCE_STANDARD.md)
-- [Public Demo City Baseline](./docs/PUBLIC_DEMO_CITY_BASELINE.md)
-- [DPG Submission Evidence](./docs/DPG_SUBMISSION_EVIDENCE.md)
+See [PUBLIC_EXPORT.md](./PUBLIC_EXPORT.md).
 
-## Security And Secrets
+## Project Governance
 
-Do not commit:
+- Apache License 2.0: [LICENSE](./LICENSE)
+- Ownership and maintainers: [OWNERSHIP.md](./OWNERSHIP.md)
+- Security policy: [SECURITY.md](./SECURITY.md)
+- Privacy posture: [PRIVACY.md](./PRIVACY.md)
+- Do No Harm: [DO_NO_HARM.md](./DO_NO_HARM.md)
+- Contributing: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Digital Public Good readiness: [DPG_READINESS.md](./DPG_READINESS.md)
 
-- `.env` files;
-- server credentials;
-- database dumps;
-- runtime auth tokens;
-- private city or provider data;
-- operator notes containing private commitments or partner context.
+## Release Status
 
-Use `.env.example` only as a template.
-
-## Current Status
-
-This is an early public release candidate. It is suitable for technical review,
-DPG readiness review, local experimentation, and partner conversations. It is
-not yet a certified operational platform for any public authority without local
-security review, deployment review, and data-governance configuration.
+Version 0.2.0 is a public technical release candidate. It is suitable for local
+installation, source review, interoperability evaluation, and bounded partner
+testing. Municipal production use still requires deployment hardening, local
+data-governance approval, security review, capacity planning, and acceptance by
+the responsible authority.

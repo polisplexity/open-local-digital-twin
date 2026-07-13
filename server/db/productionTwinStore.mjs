@@ -33,6 +33,9 @@ export {
 export {
   runCitySemanticQuery,
 } from './productionTwinStore/semanticQueryRepository.mjs'
+export {
+  getEntitySemanticContext,
+} from './productionTwinStore/semanticContextRepository.mjs'
 export { getCityLayerBimPayload } from './productionTwinStore/bimRepository.mjs'
 export {
   getCityBuildingCoverageSummary,

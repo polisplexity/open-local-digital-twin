@@ -5,9 +5,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Button, Container, Dropdown, Form, InputGroup, Nav, Navbar } from 'react-bootstrap'
 import {
+  Activity,
   AlignLeft,
   BookOpen,
   FileText,
+  Globe,
   Home,
   LogOut,
   Map,
@@ -36,7 +38,10 @@ const TopNav = () => {
   const isAdmin = Boolean(currentUser?.roles?.includes('platform-admin'))
 
   const searchItems = [
-    { href: '/cockpit', label: 'City twin workspace', icon: <Home size={14} /> },
+    { href: '/cockpit', label: 'Cockpit summary', icon: <Home size={14} /> },
+    { href: '/workspace', label: 'Technical workspace', icon: <Settings size={14} /> },
+    { href: '/operations', label: 'Operations control', icon: <Activity size={14} /> },
+    { href: '/standards', label: 'Standards readiness', icon: <Globe size={14} /> },
     { href: '/analytical-map', label: 'Analytical map', icon: <Map size={14} /> },
     { href: '/city-3d', label: 'City 3D', icon: <Shield size={14} /> },
     { href: '/civic-xr', label: 'Civic XR', icon: <UserCheck size={14} /> },
@@ -54,7 +59,10 @@ const TopNav = () => {
   }
 
   const quickActions = [
-    { href: '/cockpit', label: 'Workspace', icon: <Home size={16} />, badge: 'Live' },
+    { href: '/cockpit', label: 'Cockpit', icon: <Home size={16} />, badge: 'Live' },
+    { href: '/workspace', label: 'Workspace', icon: <Settings size={16} /> },
+    { href: '/operations', label: 'Ops', icon: <Activity size={16} /> },
+    { href: '/standards', label: 'Standards', icon: <Globe size={16} /> },
     { href: '/analytical-map', label: 'Map', icon: <Map size={16} /> },
     { href: '/city-3d', label: '3D', icon: <Shield size={16} /> },
     { href: '/civic-xr', label: 'XR', icon: <UserCheck size={16} /> },

@@ -4,11 +4,90 @@ import {
   requestOrigin,
 } from './liveHttpModel.mjs'
 
+const CACHEABLE_TWIN_QUERY_CLASS_LAYERS = new Map([
+  ['buildings', 'buildings'],
+  ['roads', 'roads'],
+  ['greenBlue', 'greenBlue'],
+  ['places', 'places'],
+])
+const CACHEABLE_TWIN_QUERY_TILE_LIMIT = 12000
+const DYNAMIC_TWIN_QUERY_TILE_LIMIT = 5000
+
+function hasQueryFilter(value) {
+  if (!value) return false
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === 'object') return Object.keys(value).length > 0
+  return true
+}
+
+function unique(values) {
+  return Array.from(new Set(values.filter(Boolean)))
+}
+
+function cacheableTwinQueryLayerKeys(classes = []) {
+  return unique(classes.map((classKey) => CACHEABLE_TWIN_QUERY_CLASS_LAYERS.get(String(classKey == null ? '' : classKey).trim())))
+}
+
+function cacheableTwinQueryDescriptor(query) {
+  if (!query || typeof query !== 'object') return null
+  const transport = query.render && typeof query.render === 'object' ? query.render.transport : ''
+  if (String(transport || '').trim() !== 'mvt') return null
+  if (hasQueryFilter(query.where)) return null
+  if (hasQueryFilter(query.sqlWhere)) return null
+  if (hasQueryFilter(query.sqlText)) return null
+
+  const clauses = Array.isArray(query.clauses) && query.clauses.length
+    ? query.clauses
+    : [{ classes: query.classes, scope: query.scope, where: query.where, sqlWhere: query.sqlWhere, sqlText: query.sqlText }]
+  if (clauses.length !== 1) return null
+
+  const clause = clauses[0] || {}
+  if (hasQueryFilter(clause.where)) return null
+  if (hasQueryFilter(clause.sqlWhere)) return null
+  if (hasQueryFilter(clause.sqlText)) return null
+  const scope = clause.scope && typeof clause.scope === 'object' ? clause.scope : query.scope
+  if (!['city', 'radius'].includes(String((scope && scope.key) || 'city'))) return null
+
+  const layerKeys = cacheableTwinQueryLayerKeys(Array.isArray(clause.classes) ? clause.classes : query.classes)
+  if (!layerKeys.length) return null
+
+  return { layerKeys, scope: scope || { key: 'city' } }
+}
+
+function cachedTwinQueryVectorTileTemplate(request, cityId, query) {
+  const descriptor = cacheableTwinQueryDescriptor(query)
+  if (!descriptor) return ''
+  const cityPath = encodeURIComponent(cityId || 'current')
+  const params = new URLSearchParams()
+  params.set('layers', descriptor.layerKeys.join(','))
+  params.set('limit', String(CACHEABLE_TWIN_QUERY_TILE_LIMIT))
+  if (descriptor.scope.key === 'radius') {
+    const center = Array.isArray(descriptor.scope.center) ? descriptor.scope.center : []
+    const radiusMeters = Number(descriptor.scope.radiusMeters)
+    if (
+      center.length !== 2 ||
+      !Number.isFinite(Number(center[0])) ||
+      !Number.isFinite(Number(center[1])) ||
+      !Number.isFinite(radiusMeters) ||
+      radiusMeters <= 0
+    ) {
+      return ''
+    }
+    params.set('center', `${Number(center[0]).toFixed(7)},${Number(center[1]).toFixed(7)}`)
+    params.set('radiusMeters', String(Math.round(radiusMeters)))
+  }
+  const path = `/api/live/${cityPath}/cached-tiles/latest/{z}/{x}/{y}.mvt?${params.toString()}`
+  const origin = requestOrigin(request)
+  return origin ? `${origin}${path}` : path
+}
+
 function twinQueryVectorTileTemplate(request, cityId, query) {
   if (!query || typeof query !== 'object') return ''
+  const cachedTemplate = cachedTwinQueryVectorTileTemplate(request, cityId, query)
+  if (cachedTemplate) return cachedTemplate
   const cityPath = encodeURIComponent(cityId || 'current')
   const encodedQuery = encodeURIComponent(JSON.stringify(query))
-  const path = `/api/live/${cityPath}/twin-query-tiles/{z}/{x}/{y}.mvt?query=${encodedQuery}`
+  const path = `/api/live/${cityPath}/twin-query-tiles/{z}/{x}/{y}.mvt?limit=${DYNAMIC_TWIN_QUERY_TILE_LIMIT}&query=${encodedQuery}`
   const origin = requestOrigin(request)
   return origin ? `${origin}${path}` : path
 }
@@ -256,12 +335,22 @@ function sceneManifestFromGeojson({ cityId, result = {}, links = {} } = {}) {
 }
 
 export function visualTwinQueryResult(request, cityId, result = {}) {
-  const vectorTileTemplate = twinQueryVectorTileTemplate(request, cityId, result.query)
+  const resultTransport = String(result.transport || result.query?.render?.transport || request.query.transport || '').trim()
+  const vectorTileTemplate = resultTransport === 'table' ? '' : twinQueryVectorTileTemplate(request, cityId, result.query)
+  const origin = requestOrigin(request)
+  const cityPath = encodeURIComponent(cityId || 'current')
+  const pathWithOrigin = (path) => origin ? `${origin}${path}` : path
+  const transport = resultTransport
   const links = {
     ...(result.links && typeof result.links === 'object' ? result.links : {}),
     ...(vectorTileTemplate ? { vectorTileTemplate } : {}),
+    ...(transport === 'selection-reference'
+      ? {
+          threeDTilesets: pathWithOrigin(`/api/live/${cityPath}/3d-tilesets?status=ready&limit=10`),
+          analysisSelectionMaterialize: pathWithOrigin(`/api/live/${cityPath}/analysis-selections/query`),
+        }
+      : {}),
   }
-  const transport = String(result.query?.render?.transport || request.query.transport || '').trim()
 
   if (transport === 'mvt' || transport === 'metadata') {
     const { geojson, ...rest } = result
@@ -269,6 +358,17 @@ export function visualTwinQueryResult(request, cityId, result = {}) {
       ...rest,
       transport,
       links,
+      geojson: undefined,
+    }
+  }
+
+  if (transport === 'selection-reference') {
+    const { geojson, selectionReference, ...rest } = result
+    return {
+      ...rest,
+      transport,
+      links,
+      selectionReference,
       geojson: undefined,
     }
   }
@@ -303,6 +403,7 @@ export function visualTwinQueryResult(request, cityId, result = {}) {
 
   return {
     ...result,
+    transport: transport || (result.geojson ? 'geojson' : ''),
     links,
   }
 }
@@ -357,6 +458,35 @@ export function twinQueryPayload(request, access) {
       ...(queryPayload.metadata && typeof queryPayload.metadata === 'object' ? queryPayload.metadata : {}),
       method: request.method,
       userAgent: request.headers['user-agent'] || null,
+    },
+  }
+}
+
+export function twinQueryExportPayload(request, access) {
+  const body = request.body && typeof request.body === 'object' ? request.body : {}
+  const queryPayload = body.query && typeof body.query === 'object'
+    ? body.query
+    : (body.query && typeof body.query === 'string' ? parseJsonish(body.query, {}) : body)
+  const format = body.format || request.query.format || request.query.f || 'csv'
+  const surface = body.surface || queryPayload.surface || request.query.surface || 'api'
+  const intent = body.intent || queryPayload.intent || request.query.intent || 'export'
+
+  return {
+    query: queryPayload,
+    format,
+    limit: body.limit ?? body.maxRows ?? body.maxFeatures ?? request.query.limit ?? request.query.maxRows ?? request.query.maxFeatures,
+    surface,
+    intent,
+    actorUserId: actorId(access, request),
+    actorRole: access.currentUser?.role || access.user?.role || request.headers['x-user-role'] || null,
+    consumerKey: body.consumerKey || request.query.consumerKey || request.headers['x-consumer-key'] || null,
+    metadata: {
+      ...(body.metadata && typeof body.metadata === 'object' ? body.metadata : {}),
+      ...(queryPayload.metadata && typeof queryPayload.metadata === 'object' ? queryPayload.metadata : {}),
+      method: request.method,
+      userAgent: request.headers['user-agent'] || null,
+      requestPath: request.originalUrl || request.url,
+      requestId: request.headers['x-request-id'] || null,
     },
   }
 }

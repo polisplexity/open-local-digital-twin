@@ -1,18 +1,18 @@
 export const twinGlobalRoutes = [
   { key: 'cockpit', label: 'Workspace', href: '/cockpit' },
   { key: 'map', label: 'Analytical Map', href: '/analytical-map' },
-  { key: 'municipal', label: 'City 3D', href: '/city-3d' },
-  { key: 'public', label: 'Civic XR', href: '/civic-xr' },
+  { key: 'city3d', label: 'City 3D', href: '/city-3d' },
+  { key: 'civicXr', label: 'Civic XR', href: '/civic-xr' },
   { key: 'theory', label: 'Theory', href: '/theory' },
   { key: 'docs', label: 'Docs', href: '/docs' },
 ]
 
 export const adminToolLinks = [
   { label: 'Admin console', href: '/admin' },
-  { label: 'Calendar', href: '/apps/calendar' },
-  { label: 'Email', href: '/apps/email' },
-  { label: 'Invoices', href: '/apps/invoices/invoice-list' },
-  { label: 'Scrumboard', href: '/apps/scrumboard/project-board' },
+  { label: 'Operations', href: '/operations' },
+  { label: 'Data Factory', href: '/operations/ingestion' },
+  { label: 'Standards', href: '/standards' },
+  { label: 'Workspace', href: '/workspace' },
 ]
 
 export const viewerBundles = {
@@ -42,7 +42,7 @@ export const viewerBundles = {
       layers: ['roads', 'buildings', 'commerce', 'wasteSeeds'],
     },
   ],
-  municipal: [
+  city3d: [
     {
       id: 'base-baseline',
       label: 'Base geometry',
@@ -62,7 +62,7 @@ export const viewerBundles = {
       layers: ['boundary', 'unclassifiedLand', 'roads', 'buildings', 'greenBlue', 'civic', 'mobility', 'commerce', 'wasteSeeds', 'places'],
     },
   ],
-  public: [
+  civicXr: [
     {
       id: 'public-realm',
       label: 'Civic base',
@@ -95,7 +95,8 @@ export const twinViewerModules = {
     viewerId: 'map',
     viewerUrl: '/live/current/map',
     defaultBundleId: '',
-    defaultCityCoverage: 0,
+    defaultCityCoverage: 10,
+    queryIdleLayers: ['boundary', 'roads', 'buildings'],
     queryDriven: true,
     supportsFidelity: false,
     supportsCityScale: true,
@@ -129,8 +130,8 @@ export const twinViewerModules = {
       ],
     },
   },
-  municipal: {
-    routeKey: 'municipal',
+  city3d: {
+    routeKey: 'city3d',
     routePath: '/city-3d',
     title: 'City 3D',
     eyebrow: 'Spatial inspection surface',
@@ -174,8 +175,8 @@ export const twinViewerModules = {
       ],
     },
   },
-  public: {
-    routeKey: 'public',
+  civicXr: {
+    routeKey: 'civicXr',
     routePath: '/civic-xr',
     title: 'Civic XR',
     eyebrow: 'Civic XR surface',
@@ -237,20 +238,18 @@ export const theoryPageConfig = {
 }
 
 export const docsPageConfig = {
-  title: 'Reference Notes and Documentation',
-  eyebrow: 'Project references',
+  title: 'OLDT User Manual',
+  eyebrow: 'Product guidance and evidence',
   summary:
-    'Surface the notes, source posture, semantic-pack roadmap, viewer posture, and interoperability path so the twin can be reviewed as a real institutional product.',
+    'Operate native OLDT capabilities, configure optional EU LDT integrations, and verify exactly what has been accepted, evaluated, or left for future work.',
   sections: [
-    { id: 'docs-brief', label: 'City brief' },
-    { id: 'docs-pack', label: 'Document pack' },
-    { id: 'docs-sources', label: 'Sources' },
-    { id: 'docs-register', label: 'Register' },
-    { id: 'docs-viewers', label: 'Viewer register' },
-    { id: 'docs-seeds', label: 'Semantic seeds' },
-    { id: 'docs-interoperability', label: 'Transport' },
-    { id: 'docs-packs', label: 'Future packs' },
-    { id: 'docs-ws2', label: 'WS2 alignment' },
+    { id: 'manual-start', label: 'Start here' },
+    { id: 'manual-native', label: 'Native OLDT' },
+    { id: 'manual-procedures', label: 'Procedures' },
+    { id: 'manual-integrations', label: 'EU LDT' },
+    { id: 'manual-models', label: 'Models' },
+    { id: 'manual-city', label: 'City evidence' },
+    { id: 'manual-reference', label: 'Reference' },
   ],
 }
 

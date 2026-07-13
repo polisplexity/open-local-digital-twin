@@ -1,9 +1,11 @@
 import {
   getTwinQueryContract,
+  getTwinQueryMvtTile,
   listCityTwinQueryEvents,
   runCityTwinQuery,
 } from '../db/productionTwinStore.mjs'
 import { closeProductionPool } from '../db/postgisPool.mjs'
+import { visualTwinQueryResult } from '../routes/liveFeature/twinQueryHttpAdapter.mjs'
 import { findCityConfig, getActiveCityConfig } from '../services/cityRegistry.mjs'
 
 function assert(condition, message) {
@@ -71,6 +73,7 @@ assert(city?.id, 'CITY_NOT_FOUND')
 const contract = getTwinQueryContract()
 assert(contract.languages.includes('twinql-json'), 'TWINQL_LANGUAGE_MISSING')
 assert(contract.languages.includes('cql2-json'), 'CQL2_LANGUAGE_MISSING')
+assert(contract.languages.includes('postgis-sql'), 'POSTGIS_SQL_LANGUAGE_MISSING')
 assert(contract.classes.includes('buildings'), 'BUILDING_CLASS_MISSING')
 assert(contract.classes.includes('roads'), 'ROADS_CLASS_MISSING')
 assert(contract.fields.some((field) => field.field === 'semantic_class'), 'SEMANTIC_CLASS_FIELD_MISSING')
@@ -95,6 +98,233 @@ assert(
   cityBuildingQuery.geojson.features.every((feature) => feature.properties?.semanticClass === 'buildings'),
   'CITY_BUILDING_SEMANTIC_CLASS_MISMATCH',
 )
+
+const expertSqlQuery = await runCityTwinQuery(city.id, {
+  language: 'postgis-sql',
+  classes: ['buildings', 'roads', 'greenBlue', 'places', 'accessSeeds', 'semanticPackOutputs', 'providerOverlays'],
+  scope: { key: 'city' },
+  sqlWhere: "semantic_class = 'buildings' AND ST_Area(co.geom::geography) > 150",
+  render: { mode: 'isolate', maxFeatures: 25 },
+  surface: 'api',
+  intent: 'analysis',
+  actorUserId: 'twin-query-smoke',
+})
+
+assert(expertSqlQuery.ok, `EXPERT_SQL_QUERY_FAILED:${expertSqlQuery.error ?? 'unknown'}`)
+assert(expertSqlQuery.summary.resultCount > 0, 'EXPERT_SQL_QUERY_EMPTY')
+assert(expertSqlQuery.summary.returned > 0, 'EXPERT_SQL_QUERY_RETURNED_EMPTY')
+assert(
+  expertSqlQuery.geojson.features.every((feature) => feature.properties?.semanticClass === 'buildings'),
+  'EXPERT_SQL_SEMANTIC_CLASS_MISMATCH',
+)
+assert(expertSqlQuery.query.language === 'postgis-sql', 'EXPERT_SQL_LANGUAGE_NOT_NORMALIZED')
+assert(
+  expertSqlQuery.query.sqlWhere.includes('ST_Area(co.geom::geography)'),
+  'EXPERT_SQL_WHERE_NOT_PRESERVED',
+)
+
+const expertCitySqlSelectQuery = await runCityTwinQuery(city.id, {
+  language: 'postgis-sql',
+  sqlText: `
+    SELECT
+      city_id,
+      object_id,
+      entity_type,
+      display_layer_key,
+      semantic_class,
+      label,
+      authority_status,
+      confidence,
+      source_coverage_status,
+      provider,
+      model_enrichments,
+      geom
+    FROM ldt_query.city_objects_enriched
+    WHERE semantic_class = 'roads'
+    ORDER BY object_id
+  `,
+  render: { mode: 'isolate', transport: 'mvt', maxFeatures: 12 },
+  surface: 'map',
+  intent: 'analysis',
+  actorUserId: 'twin-query-smoke',
+})
+
+assert(expertCitySqlSelectQuery.ok, `EXPERT_CITY_SQL_SELECT_FAILED:${expertCitySqlSelectQuery.error ?? 'unknown'}`)
+assert(expertCitySqlSelectQuery.query.sqlMode === 'select', 'EXPERT_CITY_SQL_SELECT_MODE_MISSING')
+assert(expertCitySqlSelectQuery.query.sqlText.includes('ldt_query.city_objects_enriched'), 'EXPERT_CITY_SQL_SELECT_NOT_PRESERVED')
+assert(expertCitySqlSelectQuery.summary.resultCount > 0, 'EXPERT_CITY_SQL_SELECT_EMPTY')
+assert(expertCitySqlSelectQuery.transport === 'mvt', 'EXPERT_CITY_SQL_SELECT_TRANSPORT_INVALID')
+assert(expertCitySqlSelectQuery.summary.returnedFeatures === 0, 'EXPERT_CITY_SQL_SELECT_SHOULD_NOT_RETURN_GEOJSON_FEATURES')
+assert(expertCitySqlSelectQuery.geojson.features.length === 0, 'EXPERT_CITY_SQL_SELECT_SHOULD_NOT_RETURN_GEOJSON')
+assert(expertCitySqlSelectQuery.summary.countsBySemanticClass.roads > 0, 'EXPERT_CITY_SQL_SELECT_ROADS_MISSING')
+assertBounds(expertCitySqlSelectQuery.summary.bounds, 'EXPERT_CITY_SQL_SELECT_BOUNDS')
+
+const adaptedExpertCitySqlSelect = visualTwinQueryResult({
+  headers: { host: 'localhost' },
+  protocol: 'http',
+  query: {},
+}, city.id, expertCitySqlSelectQuery)
+assert(adaptedExpertCitySqlSelect.transport === 'mvt', 'EXPERT_CITY_SQL_SELECT_ADAPTER_TRANSPORT_INVALID')
+assert(adaptedExpertCitySqlSelect.links?.vectorTileTemplate?.includes('/twin-query-tiles/'), 'EXPERT_CITY_SQL_SELECT_MVT_TEMPLATE_MISSING')
+assert(!adaptedExpertCitySqlSelect.geojson, 'EXPERT_CITY_SQL_SELECT_ADAPTER_LEAKED_GEOJSON')
+
+const expertCitySqlSelectTile = await getTwinQueryMvtTile(city.id, {
+  query: expertCitySqlSelectQuery.query,
+  z: 13,
+  x: 1789,
+  y: 3612,
+  limit: 5000,
+})
+assert(expertCitySqlSelectTile.ok, `EXPERT_CITY_SQL_SELECT_TILE_FAILED:${expertCitySqlSelectTile.error ?? 'unknown'}`)
+assert(expertCitySqlSelectTile.byteLength > 0, 'EXPERT_CITY_SQL_SELECT_TILE_EMPTY')
+
+const expertCitySqlTableQuery = await runCityTwinQuery(city.id, {
+  language: 'postgis-sql',
+  sqlText: `
+    SELECT
+      city_id,
+      semantic_class,
+      count(*)::int AS object_count
+    FROM ldt_query.city_objects_enriched
+    GROUP BY city_id, semantic_class
+    ORDER BY object_count DESC
+  `,
+  render: { mode: 'isolate', maxFeatures: 8 },
+  surface: 'api',
+  intent: 'analysis',
+  actorUserId: 'twin-query-smoke',
+})
+
+assert(expertCitySqlTableQuery.ok, `EXPERT_CITY_SQL_TABLE_FAILED:${expertCitySqlTableQuery.error ?? 'unknown'}`)
+assert(expertCitySqlTableQuery.transport === 'table', 'EXPERT_CITY_SQL_TABLE_TRANSPORT_INVALID')
+assert(expertCitySqlTableQuery.summary.returnedRows > 0, 'EXPERT_CITY_SQL_TABLE_ROWS_EMPTY')
+assert(expertCitySqlTableQuery.geojson.features.length === 0, 'EXPERT_CITY_SQL_TABLE_SHOULD_NOT_RETURN_FEATURES')
+assert(expertCitySqlTableQuery.table?.columns.includes('object_count'), 'EXPERT_CITY_SQL_TABLE_COLUMNS_MISSING')
+
+const expertSqlMvtQuery = await runCityTwinQuery(city.id, {
+  language: 'postgis-sql',
+  classes: ['buildings', 'roads', 'greenBlue', 'places', 'accessSeeds', 'semanticPackOutputs', 'providerOverlays'],
+  scope: { key: 'city' },
+  sqlWhere: "semantic_class = 'buildings' AND ST_Area(co.geom::geography) > 150",
+  render: { mode: 'isolate', transport: 'mvt', maxFeatures: 5000 },
+  surface: 'map',
+  intent: 'analysis',
+  actorUserId: 'twin-query-smoke',
+})
+assert(expertSqlMvtQuery.ok, `EXPERT_SQL_MVT_QUERY_FAILED:${expertSqlMvtQuery.error ?? 'unknown'}`)
+assert(expertSqlMvtQuery.summary.countsBySemanticClass.buildings > 0, 'EXPERT_SQL_MVT_BUILDINGS_MISSING')
+assert(!expertSqlMvtQuery.summary.countsBySemanticClass.roads, 'EXPERT_SQL_MVT_SHOULD_NOT_COUNT_ROADS')
+const adaptedExpertSqlMvt = visualTwinQueryResult({
+  headers: { host: 'localhost' },
+  protocol: 'http',
+  query: {},
+}, city.id, expertSqlMvtQuery)
+assert(adaptedExpertSqlMvt.transport === 'mvt', 'EXPERT_SQL_MVT_ADAPTER_TRANSPORT_INVALID')
+assert(adaptedExpertSqlMvt.links?.vectorTileTemplate, 'EXPERT_SQL_MVT_TILE_TEMPLATE_MISSING')
+assert(
+  adaptedExpertSqlMvt.links.vectorTileTemplate.includes('/twin-query-tiles/'),
+  'EXPERT_SQL_MVT_SHOULD_USE_QUERY_TILES',
+)
+assert(
+  !adaptedExpertSqlMvt.links.vectorTileTemplate.includes('/cached-tiles/'),
+  'EXPERT_SQL_MVT_SHOULD_NOT_USE_CACHED_TILES',
+)
+
+let unsafeSqlError = ''
+try {
+  await runCityTwinQuery(city.id, {
+    language: 'postgis-sql',
+    classes: ['buildings'],
+    scope: { key: 'city' },
+    sqlWhere: 'DELETE FROM ldt_query.city_objects',
+    render: { mode: 'count', maxFeatures: 0 },
+    surface: 'api',
+    intent: 'analysis',
+    actorUserId: 'twin-query-smoke',
+  })
+} catch (error) {
+  unsafeSqlError = String(error?.message ?? error)
+}
+assert(unsafeSqlError.includes('POSTGIS_SQL_WHERE_UNSAFE_TOKEN'), 'UNSAFE_POSTGIS_SQL_SHOULD_FAIL')
+
+let unsafeCitySqlError = ''
+try {
+  await runCityTwinQuery(city.id, {
+    language: 'postgis-sql',
+    sqlText: 'SELECT oid AS city_id FROM pg_catalog.pg_class',
+    render: { mode: 'count', maxFeatures: 0 },
+    surface: 'api',
+    intent: 'analysis',
+    actorUserId: 'twin-query-smoke',
+  })
+} catch (error) {
+  unsafeCitySqlError = String(error?.message ?? error)
+}
+assert(
+  unsafeCitySqlError.includes('POSTGIS_SQL_TEXT_UNSAFE_TOKEN') ||
+    unsafeCitySqlError.includes('POSTGIS_SQL_SCHEMA_NOT_ALLOWED:pg_catalog'),
+  'UNSAFE_POSTGIS_SELECT_SQL_SHOULD_FAIL',
+)
+
+const geojsonPreviewQuery = await runCityTwinQuery(city.id, {
+  language: 'twinql-json',
+  classes: ['buildings'],
+  scope: { key: 'city' },
+  render: { mode: 'isolate', maxFeatures: 300000 },
+  surface: 'api',
+  intent: 'analysis',
+  actorUserId: 'twin-query-smoke',
+})
+
+assert(geojsonPreviewQuery.ok, `GEOJSON_PREVIEW_QUERY_FAILED:${geojsonPreviewQuery.error ?? 'unknown'}`)
+const geojsonPolicy = geojsonPreviewQuery.summary.transportPolicy
+assert(geojsonPolicy?.transport === 'geojson', 'GEOJSON_PREVIEW_POLICY_MISSING')
+assert(geojsonPolicy.mode === 'preview', 'GEOJSON_PREVIEW_POLICY_MODE_INVALID')
+assert(geojsonPolicy.limitApplied === true, 'GEOJSON_PREVIEW_LIMIT_NOT_APPLIED')
+assert(geojsonPolicy.effectiveMaxFeatures < geojsonPolicy.requestedMaxFeatures, 'GEOJSON_PREVIEW_EFFECTIVE_LIMIT_INVALID')
+assert(geojsonPreviewQuery.summary.returned <= geojsonPolicy.effectiveMaxFeatures, 'GEOJSON_PREVIEW_RETURNED_OVER_LIMIT')
+assert(
+  typeof geojsonPolicy.warning === 'string' && geojsonPolicy.warning.includes('GeoJSON preview limited'),
+  'GEOJSON_PREVIEW_WARNING_MISSING',
+)
+if (geojsonPreviewQuery.summary.resultCount > geojsonPolicy.effectiveMaxFeatures) {
+  assert(geojsonPreviewQuery.summary.truncated === true, 'GEOJSON_PREVIEW_SHOULD_BE_TRUNCATED')
+}
+
+const selectionReferenceQuery = await runCityTwinQuery(city.id, {
+  language: 'twinql-json',
+  classes: ['buildings'],
+  scope: { key: 'city' },
+  render: { mode: 'highlight', transport: 'selection-reference', maxFeatures: 300000 },
+  surface: 'municipal3d',
+  intent: 'analysis',
+  actorUserId: 'twin-query-smoke',
+})
+
+assert(selectionReferenceQuery.ok, `SELECTION_REFERENCE_QUERY_FAILED:${selectionReferenceQuery.error ?? 'unknown'}`)
+assert(selectionReferenceQuery.summary.resultCount > 0, 'SELECTION_REFERENCE_QUERY_EMPTY')
+assert(selectionReferenceQuery.summary.returned === 0, 'SELECTION_REFERENCE_SHOULD_NOT_RETURN_FEATURES')
+assert(selectionReferenceQuery.geojson.features.length === 0, 'SELECTION_REFERENCE_GEOJSON_SHOULD_BE_EMPTY')
+assert(selectionReferenceQuery.selectionReference?.kind === 'twin-query-selection-reference', 'SELECTION_REFERENCE_KIND_MISSING')
+assert(selectionReferenceQuery.selectionReference?.queryHash, 'SELECTION_REFERENCE_QUERY_HASH_MISSING')
+assert(selectionReferenceQuery.selectionReference?.artifacts?.threeDTilesets?.href, 'SELECTION_REFERENCE_3D_TILESET_LINK_MISSING')
+assert(
+  selectionReferenceQuery.summary.transportPolicy?.transport === 'selection-reference',
+  'SELECTION_REFERENCE_POLICY_MISSING',
+)
+assert(
+  selectionReferenceQuery.summary.transportPolicy?.featurePayload === false,
+  'SELECTION_REFERENCE_POLICY_SHOULD_DISABLE_FEATURE_PAYLOAD',
+)
+const adaptedSelectionReference = visualTwinQueryResult({
+  headers: { host: 'localhost' },
+  protocol: 'http',
+  query: { transport: 'selection-reference' },
+}, city.id, selectionReferenceQuery)
+assert(adaptedSelectionReference.transport === 'selection-reference', 'SELECTION_REFERENCE_ADAPTER_TRANSPORT_INVALID')
+assert(!adaptedSelectionReference.geojson, 'SELECTION_REFERENCE_ADAPTER_LEAKED_GEOJSON')
+assert(adaptedSelectionReference.selectionReference?.queryHash, 'SELECTION_REFERENCE_ADAPTER_QUERY_HASH_MISSING')
+assert(adaptedSelectionReference.links?.threeDTilesets, 'SELECTION_REFERENCE_ADAPTER_3D_TILESET_LINK_MISSING')
 
 const radiusRoadQuery = await runCityTwinQuery(city.id, {
   language: 'cql2-json',
@@ -147,6 +377,29 @@ assert(countQuery.summary.resultCount > 0, 'COUNT_QUERY_EMPTY')
 assert(countQuery.summary.returned === 0, 'COUNT_QUERY_SHOULD_NOT_RETURN_FEATURES')
 assert(countQuery.summary.countsBySemanticClass.buildings > 0, 'COUNT_QUERY_BUILDINGS_MISSING')
 assert(countQuery.summary.countsBySemanticClass.roads > 0, 'COUNT_QUERY_ROADS_MISSING')
+
+const canonicalClassQuery = await runCityTwinQuery(city.id, {
+  language: 'cql2-json',
+  classes: ['builtFabric', 'mobilityNetwork'],
+  scope: { key: 'city' },
+  where: {
+    op: 'in',
+    args: [{ property: 'semantic_class' }, ['builtFabric', 'mobilityNetwork']],
+  },
+  render: { mode: 'count', maxFeatures: 0 },
+  surface: 'api',
+  intent: 'analysis',
+  actorUserId: 'twin-query-smoke',
+})
+
+assert(canonicalClassQuery.ok, `CANONICAL_CLASS_QUERY_FAILED:${canonicalClassQuery.error ?? 'unknown'}`)
+assert(
+  JSON.stringify(canonicalClassQuery.query.classes) === JSON.stringify(['buildings', 'roads']),
+  'CANONICAL_CLASS_QUERY_NOT_RUNTIME_NORMALIZED',
+)
+assert(canonicalClassQuery.summary.resultCount > 0, 'CANONICAL_CLASS_QUERY_EMPTY')
+assert(canonicalClassQuery.summary.countsBySemanticClass.buildings > 0, 'CANONICAL_CLASS_QUERY_BUILDINGS_MISSING')
+assert(canonicalClassQuery.summary.countsBySemanticClass.roads > 0, 'CANONICAL_CLASS_QUERY_ROADS_MISSING')
 
 const compoundPredicateQuery = await runCityTwinQuery(city.id, {
   language: 'cql2-json',
@@ -244,6 +497,34 @@ console.log(JSON.stringify({
     truncated: cityBuildingQuery.summary.truncated,
     countsBySemanticClass: cityBuildingQuery.summary.countsBySemanticClass,
   },
+  expertSqlQuery: {
+    resultCount: expertSqlQuery.summary.resultCount,
+    returned: expertSqlQuery.summary.returned,
+    truncated: expertSqlQuery.summary.truncated,
+    sqlWhere: expertSqlQuery.query.sqlWhere,
+  },
+  expertSqlMvtQuery: {
+    resultCount: expertSqlMvtQuery.summary.resultCount,
+    returned: expertSqlMvtQuery.summary.returned,
+    countsBySemanticClass: expertSqlMvtQuery.summary.countsBySemanticClass,
+    vectorTileTemplate: adaptedExpertSqlMvt.links?.vectorTileTemplate,
+  },
+  unsafeSqlQuery: {
+    rejected: Boolean(unsafeSqlError),
+    error: unsafeSqlError,
+  },
+  geojsonPreviewQuery: {
+    resultCount: geojsonPreviewQuery.summary.resultCount,
+    returned: geojsonPreviewQuery.summary.returned,
+    truncated: geojsonPreviewQuery.summary.truncated,
+    transportPolicy: geojsonPreviewQuery.summary.transportPolicy,
+  },
+  selectionReferenceQuery: {
+    resultCount: selectionReferenceQuery.summary.resultCount,
+    returned: selectionReferenceQuery.summary.returned,
+    queryHash: selectionReferenceQuery.selectionReference?.queryHash,
+    transportPolicy: selectionReferenceQuery.summary.transportPolicy,
+  },
   radiusRoadQuery: {
     resultCount: radiusRoadQuery.summary.resultCount,
     returned: radiusRoadQuery.summary.returned,
@@ -254,6 +535,11 @@ console.log(JSON.stringify({
     resultCount: countQuery.summary.resultCount,
     returned: countQuery.summary.returned,
     countsBySemanticClass: countQuery.summary.countsBySemanticClass,
+  },
+  canonicalClassQuery: {
+    resultCount: canonicalClassQuery.summary.resultCount,
+    normalizedClasses: canonicalClassQuery.query.classes,
+    countsBySemanticClass: canonicalClassQuery.summary.countsBySemanticClass,
   },
   compoundPredicateQuery: {
     resultCount: compoundPredicateQuery.summary.resultCount,

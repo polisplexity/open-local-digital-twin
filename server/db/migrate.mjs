@@ -16,8 +16,8 @@ export function productionDatabaseConfigured() {
   return Boolean(getProductionDatabaseUrl())
 }
 
-function createPool() {
-  const connectionString = getProductionDatabaseUrl()
+function createPool(connectionStringOverride = '') {
+  const connectionString = connectionStringOverride || getProductionDatabaseUrl()
   if (!connectionString) return null
   return new Pool({
     connectionString,
@@ -42,8 +42,7 @@ function listMigrationFiles() {
     .sort()
 }
 
-export async function runProductionMigrations() {
-  const pool = createPool()
+async function runMigrationsWithPool(pool) {
   if (!pool) {
     return {
       configured: false,
@@ -89,6 +88,14 @@ export async function runProductionMigrations() {
     client.release()
     await pool.end()
   }
+}
+
+export async function runProductionMigrations() {
+  return runMigrationsWithPool(createPool())
+}
+
+export async function runProductionMigrationsForDatabaseUrl(databaseUrl) {
+  return runMigrationsWithPool(createPool(databaseUrl))
 }
 
 export async function getProductionDatabaseStatus() {
@@ -140,4 +147,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       process.exit(1)
     })
 }
-

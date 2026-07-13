@@ -260,6 +260,62 @@ export function renderSharedShell({
         border-color: rgba(15,118,110,0.32);
         color: #0f766e;
       }
+      .basemap-switcher {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.22rem;
+        padding: 0.24rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(255,255,255,0.88);
+        box-shadow: 0 8px 20px rgba(15,23,42,0.1);
+        backdrop-filter: blur(10px);
+      }
+      .basemap-switcher--floating {
+        position: absolute;
+        z-index: 6;
+      }
+      .basemap-switcher--map {
+        left: 12px;
+        bottom: 12px;
+      }
+      .basemap-switcher--scene {
+        right: 12px;
+        bottom: 42px;
+      }
+      .basemap-switcher span {
+        padding: 0 0.36rem 0 0.46rem;
+        color: var(--muted);
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+      .basemap-switcher button {
+        min-width: 58px;
+        border: 0;
+        border-radius: 999px;
+        padding: 0.36rem 0.58rem;
+        background: transparent;
+        color: var(--muted);
+        font-size: 0.73rem;
+        font-weight: 800;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .basemap-switcher button:hover {
+        color: var(--ink);
+        background: rgba(15,118,110,0.08);
+      }
+      .basemap-switcher button[aria-pressed="true"] {
+        background: #00838b;
+        color: #ffffff;
+      }
+      .basemap-switcher button[data-basemap="satellite"][aria-pressed="true"] {
+        background: #1f2937;
+        color: #f8fafc;
+      }
       .canvas-wrap {
         position: relative;
         min-height: 74vh;
@@ -516,11 +572,16 @@ export function renderSharedShell({
       body[data-viewer-theme="dark"] .civic-xr-semantic-panel,
       body[data-viewer-theme="dark"] .civic-xr-compare-panel,
       body[data-viewer-theme="dark"] .civic-xr-presence-controls,
+      body[data-viewer-theme="dark"] .basemap-switcher,
       body[data-viewer-theme="dark"] .status-pill,
       body[data-viewer-theme="dark"] .stage-action,
       body[data-viewer-theme="dark"] .toolbar button,
       body[data-viewer-theme="dark"] .tour-grid button {
         background: rgba(15,23,42,0.82);
+      }
+      body[data-viewer-theme="dark"] .basemap-switcher button[aria-pressed="true"] {
+        background: #f8fafc;
+        color: #020617;
       }
       .tour-grid {
         display: grid;

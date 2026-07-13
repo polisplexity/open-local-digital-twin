@@ -897,7 +897,7 @@ export default function AdminRegistryPageClient({ initialRegistry }) {
             <Card className="card-border">
               <Card.Header>
                 <div className="text-uppercase fs-8 fw-semibold text-primary letter-spacing-3 mb-2">Restricted tools</div>
-                <h5 className="mb-0">Template surfaces still available for admin</h5>
+                <h5 className="mb-0">Operational surfaces available for admin</h5>
               </Card.Header>
               <Card.Body className="d-grid gap-2">
                 {adminToolLinks.map((tool) => (

@@ -3,6 +3,7 @@ import pg from 'pg'
 
 import {
   closeLdtHydrologyGridExtractorPool,
+  getHydrologyGridExtractorPreflight,
   runHydrologyGridExtractor,
 } from '../services/ldtHydrologyGridExtractorService.mjs'
 import {
@@ -17,7 +18,7 @@ function argValue(name) {
   return arg ? arg.slice(prefix.length) : ''
 }
 
-const cityId = argValue('city') || 'kharkiv'
+const cityId = argValue('city') || 'guanajuato'
 const scenarioKey = argValue('scenario') || 'baseline'
 const sourceGridKey = argValue('source-grid-key') || undefined
 const layerKey = 'hydrology_surface_water_signal'
@@ -27,6 +28,24 @@ const pool = new pg.Pool({
 })
 
 try {
+  const preflight = await getHydrologyGridExtractorPreflight(cityId, {
+    scenarioKey,
+    sourceGridKey,
+  })
+  assert.equal(preflight.ok, true, 'HYDROLOGY_PREFLIGHT_NOT_OK')
+  assert.equal(preflight.canRun, true, `HYDROLOGY_PREFLIGHT_BLOCKED:${JSON.stringify(preflight)}`)
+  assert(preflight.counts.terrainElevationCells > 0, 'HYDROLOGY_PREFLIGHT_TERRAIN_MISSING')
+
+  const dryRun = await runHydrologyGridExtractor({
+    cityIds: [cityId],
+    scenarioKey,
+    sourceGridKey,
+    dryRun: true,
+  })
+  assert.equal(dryRun.ok, true, 'HYDROLOGY_DRY_RUN_NOT_OK')
+  assert.equal(dryRun.dryRun, true, 'HYDROLOGY_DRY_RUN_FLAG_MISSING')
+  assert.equal(dryRun.cities[0].skippedWrite, true, 'HYDROLOGY_DRY_RUN_SHOULD_SKIP_WRITES')
+
   const result = await runHydrologyGridExtractor({
     cityIds: [cityId],
     scenarioKey,
@@ -109,6 +128,7 @@ try {
     sourceGridKey: city.sourceGridKey,
     cellsWritten: city.cellsWritten,
     objectObservations: city.objectObservations,
+    preflight: preflight.counts,
     waterEvidenceCount: city.waterEvidenceCount,
     sampledObjectId: objectRow.rows[0].object_id,
   }, null, 2))

@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import { getProductionPool } from '../../db/postgisPool.mjs'
 import { upsertCity3dTilesetRecord } from '../../db/productionTwinStore/city3dTilesetRepository.mjs'
+import { registerThreeDTilesArtifact } from '../viewerArtifacts/viewerArtifactScanner.mjs'
 import { buildExtrudedBuildingGlb, regionBoundingVolume } from './glbBuilder.mjs'
 import {
   threeDTilesTilesetUrl,
@@ -263,6 +264,7 @@ export async function buildCity3dBuildingTileset(options = {}) {
         },
       },
     }, { client })
+    const artifact = await registerThreeDTilesArtifact(cityId, record, { activate: true })
 
     return {
       ok: true,
@@ -270,6 +272,7 @@ export async function buildCity3dBuildingTileset(options = {}) {
       tilesetKey,
       version,
       record,
+      artifact,
       packageDir: packageResult.packageDir,
       tilesetUrl: record.tilesetUrl,
       files: {
@@ -291,4 +294,3 @@ export async function buildCity3dBuildingTileset(options = {}) {
     client.release()
   }
 }
-

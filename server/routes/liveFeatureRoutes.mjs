@@ -4,12 +4,14 @@ import { buildMapSurfaceManifest } from '../services/baseTwin/viewerContracts/ma
 import { buildViewerSurfaceManifest } from '../services/baseTwin/viewerContracts/viewerSurfaceManifest.mjs'
 import {
   twinQueryEventsQuery,
+  twinQueryExportPayload,
   twinQueryPayload,
   twinQueryTilePayload,
   visualTwinQueryResult,
 } from './liveFeature/twinQueryHttpAdapter.mjs'
 import {
   executeCityTwinQuery,
+  exportCityTwinQuery,
   getCityTwinQueryContract,
   getCityTwinQueryTile,
   listCityTwinQueryRunEvents,
@@ -17,8 +19,13 @@ import {
 import { registerSemanticQueryRoutes } from './liveFeature/semanticQueryRoutes.mjs'
 import { registerSelectionRoutes } from './liveFeature/selectionRoutes.mjs'
 import { registerShareManifestRoutes } from './liveFeature/shareManifestRoutes.mjs'
+import { registerQueryLibraryRoutes } from './liveFeature/queryLibraryRoutes.mjs'
 import { registerViewportFeatureRoutes } from './liveFeature/viewportFeatureRoutes.mjs'
 import { registerAnalysisSelectionRoutes } from './liveFeature/analysisSelectionRoutes.mjs'
+import { registerSemanticContextRoutes } from './liveFeature/semanticContextRoutes.mjs'
+import { registerSubjectQueryRoutes } from './liveFeature/subjectQueryRoutes.mjs'
+import { registerWorldComparisonRoutes } from './liveFeature/worldComparisonRoutes.mjs'
+import { getCitySubjectQueryContract } from '../services/subjectQuery/subjectQueryService.mjs'
 
 function mapSurfaceMode(request) {
   return String(request.query.mode || 'cockpit')
@@ -62,7 +69,10 @@ async function sendTwinQueryContract(request, response, { requireLiveCityAccess,
     response.json({
       ok: true,
       cityId: access.cityId,
-      contract: getCityTwinQueryContract(),
+      contract: {
+        ...getCityTwinQueryContract(),
+        subjectQuery: await getCitySubjectQueryContract(access.cityId),
+      },
     })
   } catch (error) {
     response.status(502).json({
@@ -81,6 +91,28 @@ async function sendTwinQuery(request, response, { requireLiveCityAccess, request
   } catch (error) {
     response.status(422).json({
       error: 'LIVE_TWIN_QUERY_FAILED',
+      detail: String(error?.message ?? 'UNKNOWN_ERROR'),
+    })
+  }
+}
+
+async function sendTwinQueryExport(request, response, { requireLiveCityAccess, requestedCityId }) {
+  try {
+    const access = requireLiveAccess(request, response, requireLiveCityAccess, requestedCityId)
+    if (!access) return
+    const result = await exportCityTwinQuery(access.cityId, twinQueryExportPayload(request, access))
+    if (!result.ok) {
+      response.status(result.status || 422).json(result)
+      return
+    }
+    response.setHeader('Content-Type', result.contentType || 'application/octet-stream')
+    response.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`)
+    response.setHeader('X-Twin-Query-Export-Format', result.format)
+    response.setHeader('X-Twin-Query-Export-Rows', String(result.rowCount ?? 0))
+    response.send(result.body)
+  } catch (error) {
+    response.status(422).json({
+      error: 'LIVE_TWIN_QUERY_EXPORT_FAILED',
       detail: String(error?.message ?? 'UNKNOWN_ERROR'),
     })
   }
@@ -198,6 +230,16 @@ export function registerLiveFeatureRoutes(app, { requireLiveCityAccess }) {
     requestedCityId: request.params.cityId,
   }))
 
+  app.post('/api/live/current/twin-query/export', (request, response) => sendTwinQueryExport(request, response, {
+    requireLiveCityAccess,
+    requestedCityId: 'current',
+  }))
+
+  app.post('/api/live/:cityId/twin-query/export', (request, response) => sendTwinQueryExport(request, response, {
+    requireLiveCityAccess,
+    requestedCityId: request.params.cityId,
+  }))
+
   app.get('/api/live/current/twin-query-tiles/:z/:x/:y.mvt', (request, response) => sendTwinQueryMvtTile(request, response, {
     requireLiveCityAccess,
     requestedCityId: 'current',
@@ -209,8 +251,12 @@ export function registerLiveFeatureRoutes(app, { requireLiveCityAccess }) {
   }))
 
   registerViewportFeatureRoutes(app, { requireLiveCityAccess })
+  registerSemanticContextRoutes(app, { requireLiveCityAccess })
+  registerSubjectQueryRoutes(app, { requireLiveCityAccess })
+  registerWorldComparisonRoutes(app, { requireLiveCityAccess })
   registerSemanticQueryRoutes(app, { requireLiveCityAccess })
   registerSelectionRoutes(app, { requireLiveCityAccess })
   registerAnalysisSelectionRoutes(app, { requireLiveCityAccess })
+  registerQueryLibraryRoutes(app, { requireLiveCityAccess })
   registerShareManifestRoutes(app, { requireLiveCityAccess })
 }

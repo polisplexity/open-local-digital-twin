@@ -5,7 +5,7 @@ import { renderMapLibreSourceRuntime } from './mapLibre/mapLibreSourceRuntime.mj
 import { renderMapLibreControlRuntime } from './mapLibre/mapLibreControlRuntime.mjs'
 import { renderViewerShareManifestRuntime } from './viewerShareManifestRuntime.mjs'
 
-export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceManifest = {} }) {
+export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceManifest = {}, baseMapCatalog = null }) {
   return `
       <script src="/vendor/maplibre-gl/maplibre-gl.js"></script>
       <script>
@@ -23,8 +23,12 @@ export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceM
         const baseEndpoint = ${JSON.stringify(baseEndpoint)}
         const cityName = ${JSON.stringify(cityName)}
         const surfaceManifest = ${JSON.stringify(surfaceManifest)}
+        const baseMapCatalog = ${JSON.stringify(baseMapCatalog)}
         const viewportSourceId = 'twin-viewport-features'
         const semanticQuerySourceId = 'twin-semantic-query'
+        const baseMapSourceId = 'base-map-raster'
+        const baseMapLayerId = 'base-map-layer'
+        const baseMapStorageKey = 'twin:base-map'
         const sourceLayerName = 'features'
         const featureLayerIds = [
           'twin-green-fill',
@@ -40,6 +44,12 @@ export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceM
           'twin-query-line',
           'twin-query-points',
         ]
+        const fragmentWorkspaceSourceId = 'twin-fragment-workspace'
+        const fragmentWorkspaceLayerIds = [
+          'twin-fragment-fill',
+          'twin-fragment-line',
+          'twin-fragment-points',
+        ]
         const fixedLayerIds = [
           'boundary-fill',
           'boundary-line',
@@ -52,7 +62,7 @@ export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceM
         const layerState = {}
         const layerControlState = {}
         const scaleState = {
-          coveragePercent: 0,
+          coveragePercent: 100,
           featureLimit: 0,
           revision: 0,
         }
@@ -68,7 +78,12 @@ export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceM
         let mapReady = false
         let semanticQueryActive = false
         let semanticQueryVectorMode = false
+        let fragmentWorkspaceVectorLayerIds = []
+        let fragmentWorkspaceVectorSourceIds = []
         let visualTheme = 'light'
+        let activeBaseMapId = initialBaseMapId()
+        let pendingBaseMapInstall = false
+        let baseMapSwitcherInstalled = false
         const manifestLayerKeys = new Set(
           (surfaceManifest?.layerFamilies || [])
             .flatMap((family) => [family.key, ...(family.keys || [])])
@@ -87,6 +102,141 @@ export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceM
 
         function layerAllowed(key) {
           return !manifestLayerKeys.size || manifestLayerKeys.has(key)
+        }
+
+        function baseMapEntries() {
+          return Array.isArray(baseMapCatalog?.entries) ? baseMapCatalog.entries : []
+        }
+
+        function baseMapById(id) {
+          return baseMapEntries().find((entry) => entry?.id === id) || null
+        }
+
+        function defaultBaseMap() {
+          return baseMapById(baseMapCatalog?.defaultId) || baseMapEntries()[0] || { id: 'clean', type: 'blank', attribution: 'Twin overlay only' }
+        }
+
+        function currentBaseMap() {
+          return baseMapById(activeBaseMapId) || defaultBaseMap()
+        }
+
+        function initialBaseMapId() {
+          try {
+            const stored = String(window.localStorage?.getItem(baseMapStorageKey) || '')
+            if (stored && baseMapById(stored)) return stored
+          } catch {}
+          return defaultBaseMap().id
+        }
+
+        function baseMapAttribution(entry = currentBaseMap()) {
+          return String(entry?.attribution || '')
+        }
+
+        function baseMapTiles(entry = currentBaseMap()) {
+          return Array.isArray(entry?.tiles) ? entry.tiles.filter(Boolean) : []
+        }
+
+        function baseMapPaint(entry = currentBaseMap()) {
+          const paint = entry?.mapLibrePaint || {}
+          return paint[visualTheme] || paint.light || {}
+        }
+
+        function baseMapLayerDefinition(entry = currentBaseMap()) {
+          return {
+            id: baseMapLayerId,
+            type: 'raster',
+            source: baseMapSourceId,
+            paint: baseMapPaint(entry),
+          }
+        }
+
+        function baseMapSourceDefinition(entry = currentBaseMap()) {
+          return {
+            type: 'raster',
+            tiles: baseMapTiles(entry),
+            tileSize: Number(entry?.tileSize) || 256,
+            maxzoom: Number(entry?.maximumLevel) || 19,
+            attribution: baseMapAttribution(entry),
+          }
+        }
+
+        function initialMapStyle() {
+          const entry = currentBaseMap()
+          const sources = {}
+          const layers = []
+          if (entry?.type === 'raster' && baseMapTiles(entry).length) {
+            sources[baseMapSourceId] = baseMapSourceDefinition(entry)
+            layers.push(baseMapLayerDefinition(entry))
+          }
+          return {
+            version: 8,
+            sources,
+            layers,
+          }
+        }
+
+        function firstOverlayLayerId() {
+          return [...fixedLayerIds, ...featureLayerIds, ...semanticQueryLayerIds].find((layerId) => map?.getLayer(layerId))
+        }
+
+        function removeBaseMapLayer() {
+          if (!map) return
+          if (map.getLayer(baseMapLayerId)) map.removeLayer(baseMapLayerId)
+          if (map.getSource(baseMapSourceId)) map.removeSource(baseMapSourceId)
+        }
+
+        function installBaseMapLayer(entry = currentBaseMap()) {
+          if (!map || !mapReady || (typeof map.isStyleLoaded === 'function' && !map.isStyleLoaded())) {
+            pendingBaseMapInstall = true
+            return
+          }
+          pendingBaseMapInstall = false
+          removeBaseMapLayer()
+          if (entry?.type !== 'raster' || !baseMapTiles(entry).length) return
+          map.addSource(baseMapSourceId, baseMapSourceDefinition(entry))
+          const beforeLayer = firstOverlayLayerId()
+          map.addLayer(baseMapLayerDefinition(entry), beforeLayer)
+        }
+
+        function updateBaseMapButtons() {
+          document.documentElement.setAttribute('data-basemap', currentBaseMap().id)
+          document.body?.setAttribute('data-basemap', currentBaseMap().id)
+          document.querySelectorAll('[data-basemap]').forEach((button) => {
+            const active = button.getAttribute('data-basemap') === currentBaseMap().id
+            button.setAttribute('aria-pressed', active ? 'true' : 'false')
+          })
+        }
+
+        function currentBaseMapState() {
+          const entry = currentBaseMap()
+          return {
+            id: entry.id,
+            label: entry.label || entry.shortLabel || entry.id,
+            type: entry.type || 'unknown',
+          }
+        }
+
+        function setBaseMap(nextId, { persist = true, broadcastState = true } = {}) {
+          const entry = baseMapById(nextId) || defaultBaseMap()
+          activeBaseMapId = entry.id
+          if (persist) {
+            try { window.localStorage?.setItem(baseMapStorageKey, activeBaseMapId) } catch {}
+          }
+          updateBaseMapButtons()
+          installBaseMapLayer(entry)
+          applyMapVisualTheme(visualTheme)
+          if (broadcastState) broadcastMapState({ baseMap: currentBaseMapState() })
+        }
+
+        function installBaseMapSwitcher() {
+          updateBaseMapButtons()
+          if (baseMapSwitcherInstalled) return
+          baseMapSwitcherInstalled = true
+          document.querySelectorAll('[data-basemap]').forEach((button) => {
+            button.addEventListener('click', () => {
+              setBaseMap(button.getAttribute('data-basemap') || baseMapCatalog?.defaultId)
+            })
+          })
         }
 
         function setTileStatus(label, visible = false) {
@@ -181,11 +331,9 @@ export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceM
           document.body?.setAttribute('data-viewer-theme', visualTheme)
           if (!map) return
           const palette = themePalette()
-          setPaintIfLayer('osm-base', 'raster-opacity', palette.baseOpacity)
-          setPaintIfLayer('osm-base', 'raster-saturation', -1)
-          setPaintIfLayer('osm-base', 'raster-contrast', palette.baseContrast)
-          setPaintIfLayer('osm-base', 'raster-brightness-min', palette.baseBrightnessMin)
-          setPaintIfLayer('osm-base', 'raster-brightness-max', palette.baseBrightnessMax)
+          Object.entries(baseMapPaint()).forEach(([property, value]) => {
+            setPaintIfLayer(baseMapLayerId, property, value)
+          })
           setPaintIfLayer('boundary-fill', 'fill-color', palette.boundaryFill)
           setPaintIfLayer('boundary-line', 'line-color', palette.boundaryLine)
           setPaintIfLayer('coverage-radius-fill', 'fill-color', palette.coverageFill)
@@ -227,6 +375,43 @@ export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceM
           return response.json()
         }
 
+        function currentMapCameraState() {
+          if (!map) return null
+          const center = map.getCenter()
+          return {
+            mode: 'maplibre-camera',
+            center: { lon: center.lng, lat: center.lat },
+            zoom: map.getZoom(),
+            bearing: map.getBearing(),
+            pitch: map.getPitch(),
+          }
+        }
+
+        function broadcastMapState(extra = {}) {
+          broadcast('twin:state', {
+            layers: layerState,
+            camera: currentMapCameraState(),
+            baseMap: currentBaseMapState(),
+            runtime: 'maplibre',
+            ...extra,
+          })
+        }
+
+        function applyMapCameraState(camera = {}) {
+          if (!map || !camera || typeof camera !== 'object') return
+          const center = camera.center || {}
+          const lon = Number(center.lon ?? camera.lon ?? camera.lng)
+          const lat = Number(center.lat ?? camera.lat)
+          if (!Number.isFinite(lon) || !Number.isFinite(lat)) return
+          map.jumpTo({
+            center: [lon, lat],
+            zoom: Number.isFinite(Number(camera.zoom)) ? Number(camera.zoom) : map.getZoom(),
+            bearing: Number.isFinite(Number(camera.bearing)) ? Number(camera.bearing) : map.getBearing(),
+            pitch: Number.isFinite(Number(camera.pitch)) ? Number(camera.pitch) : map.getPitch(),
+          })
+          broadcastMapState()
+        }
+
         ${renderMapLibreGeometryRuntime()}
         ${renderMapLibreLayerModelRuntime()}
         ${renderMapLibreSelectionRuntime()}
@@ -264,6 +449,8 @@ export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceM
           }
         }
 
+        installBaseMapSwitcher()
+
         loadPayload().then((nextPayload) => {
           payload = nextPayload
           cityCenter = [
@@ -275,11 +462,12 @@ export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceM
           }
           maxCityRadiusMeters = calculateMaxRadius(cityCenter, payload.layers?.boundary)
           seedLayerState(payload)
+          const initialZoom = maxCityRadiusMeters > 20000 ? 9.5 : maxCityRadiusMeters > 8000 ? 10.5 : 11.5
 
           map = new maplibregl.Map({
             container: 'map',
             center: cityCenter,
-            zoom: cityName.toLowerCase().includes('kharkiv') ? 9.5 : 11.5,
+            zoom: initialZoom,
             minZoom: 2,
             maxZoom: 20,
             attributionControl: true,
@@ -289,49 +477,26 @@ export function renderMapLibreRuntime({ cityId, baseEndpoint, cityName, surfaceM
               }
               return { url }
             },
-            style: {
-              version: 8,
-              sources: {
-                osm: {
-                  type: 'raster',
-                  tiles: [
-                    'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  ],
-                  tileSize: 256,
-                  attribution: '© OpenStreetMap contributors',
-                },
-              },
-              layers: [
-                {
-                  id: 'osm-base',
-                  type: 'raster',
-                  source: 'osm',
-                  paint: {
-                    'raster-opacity': 0.46,
-                    'raster-saturation': -0.95,
-                    'raster-contrast': -0.08,
-                    'raster-brightness-min': 0.92,
-                    'raster-brightness-max': 1,
-                  },
-                },
-              ],
-            },
+            style: initialMapStyle(),
           })
           map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
+          installBaseMapSwitcher()
           map.on('load', () => {
             mapReady = true
             watchVisualTheme()
+            if (pendingBaseMapInstall || currentBaseMap().id !== defaultBaseMap().id) {
+              installBaseMapLayer(currentBaseMap())
+            }
             addBaseSources()
             applyMapVisualTheme()
             fitBoundary()
             setupSelection()
             readyBroadcasted = true
-            broadcast('twin:ready', { layers: layerState })
-            broadcast('twin:state', { layers: layerState })
+            broadcast('twin:ready', { layers: layerState, camera: currentMapCameraState(), baseMap: currentBaseMapState(), runtime: 'maplibre' })
+            broadcastMapState()
             applyInitialSharedQueryOrTiles()
           })
+          map.on('moveend', () => broadcastMapState())
           map.on('error', (event) => {
             const message = String(event?.error?.message || '')
             if (message.includes('404') || message.includes('No data found')) return

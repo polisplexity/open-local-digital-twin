@@ -3,11 +3,10 @@ import { getProductionDatabaseUrl } from './migrate.mjs'
 
 const { Pool } = pg
 
-const DEFAULT_CITY_ID = 'kharkiv'
-const DEFAULT_RAW_SCHEMA = 'raw_osm_kharkiv'
-const DEFAULT_SOURCE_SLUG = 'geofabrik-ukraine-osm-pbf'
-const DEFAULT_SOURCE_URL = 'https://download.geofabrik.de/europe/ukraine-latest.osm.pbf'
-const DEFAULT_LOCAL_SOURCE_PATH = '/app/runtime-data/extracts/kharkiv/ukraine-latest.osm.pbf'
+const DEFAULT_CITY_ID = process.env.TWIN_STUDIO_E2E_CITY_ID || process.env.TWIN_STUDIO_CITY_ID || ''
+const DEFAULT_SOURCE_SLUG = process.env.TWIN_STUDIO_OSM_SOURCE_SLUG || ''
+const DEFAULT_SOURCE_URL = process.env.TWIN_STUDIO_OSM_SOURCE_URL || ''
+const DEFAULT_LOCAL_SOURCE_PATH = process.env.TWIN_STUDIO_OSM_PBF_SOURCE_PATH || ''
 
 const LAYERS = [
   {
@@ -135,13 +134,25 @@ function parseArgs() {
     const arg = process.argv.find((entry) => entry.startsWith(`--${name}=`))
     return arg ? arg.slice(name.length + 3).trim() : fallback
   }
+  const cityId = value('city', DEFAULT_CITY_ID)
+  const rawSchema = value('schema', process.env.TWIN_STUDIO_RAW_OSM_SCHEMA || defaultRawSchema(cityId))
   return {
-    cityId: value('city', DEFAULT_CITY_ID),
-    rawSchema: value('schema', DEFAULT_RAW_SCHEMA),
-    sourceSlug: value('source-slug', DEFAULT_SOURCE_SLUG),
+    cityId,
+    rawSchema,
+    sourceSlug: value('source-slug', DEFAULT_SOURCE_SLUG || defaultSourceSlug(cityId)),
     sourceUrl: value('source-url', DEFAULT_SOURCE_URL),
     sourcePath: value('source-path', DEFAULT_LOCAL_SOURCE_PATH),
   }
+}
+
+function defaultRawSchema(cityId) {
+  const suffix = String(cityId ?? '').trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '')
+  return suffix ? `raw_osm_${suffix}` : ''
+}
+
+function defaultSourceSlug(cityId) {
+  const suffix = String(cityId ?? '').trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '')
+  return suffix ? `${suffix}-osm-pbf` : ''
 }
 
 function createPool() {
@@ -507,6 +518,8 @@ async function promoteLayer(client, cityId, layer, datasetId, activityId, option
 export async function promoteRawOsmPbfExtract(optionsInput = {}) {
   const parsed = parseArgs()
   const options = { ...parsed, ...(optionsInput ?? {}) }
+  if (!options.cityId) throw new Error('CITY_ID_REQUIRED: pass --city=<city-id> or set TWIN_STUDIO_CITY_ID')
+  if (!options.rawSchema) throw new Error('RAW_OSM_SCHEMA_REQUIRED: pass --schema=<raw-schema> or set TWIN_STUDIO_RAW_OSM_SCHEMA')
   assertIdentifier(options.rawSchema, 'raw_schema')
   for (const layer of LAYERS) assertIdentifier(layer.table, 'raw_table')
 

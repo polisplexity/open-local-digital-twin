@@ -97,7 +97,7 @@ function primeFromLegacyJsonFiles() {
   if (registry) {
     runtimeState.registry = {
       version: Number(registry.version ?? 1) || 1,
-      active_city_id: String(registry.activeCityId ?? registry.active_city_id ?? 'adazi'),
+      active_city_id: String(registry.activeCityId ?? registry.active_city_id ?? 'guanajuato'),
       updated_at: nowIso(),
     }
     runtimeState.registryCities = Array.isArray(registry.cities)

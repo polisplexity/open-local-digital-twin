@@ -1,11 +1,19 @@
 import { getProductionPool } from '../postgisPool.mjs'
 import { semanticClassDefinitions } from '../../services/baseTwin/viewerContracts/semanticQueryContract.mjs'
+import {
+  DEFAULT_CANONICAL_SEMANTIC_QUERY_CLASS_KEYS,
+  canonicalSemanticClassPriorityCaseSql,
+  normalizeCanonicalSemanticClassKeys,
+  semanticClassCaseSql,
+  semanticClassEntityTypesFor,
+  semanticClassLayerKeysFor,
+} from '../../services/semanticLayer/semanticVocabularyAdapter.mjs'
 import { viewerFeatureProperties } from './featurePresentation.mjs'
 import { parseMaybeJson } from './repositoryUtils.mjs'
 
 const DEFAULT_SEMANTIC_QUERY_LIMIT = integerEnv('TWIN_STUDIO_SEMANTIC_QUERY_DEFAULT_LIMIT', 5000)
 const MAX_SEMANTIC_QUERY_LIMIT = integerEnv('TWIN_STUDIO_SEMANTIC_QUERY_MAX_LIMIT', 50000)
-const DEFAULT_CLASSES = ['buildings', 'roads', 'greenBlue', 'places', 'accessSeeds']
+const DEFAULT_CLASSES = DEFAULT_CANONICAL_SEMANTIC_QUERY_CLASS_KEYS
 const SURFACES = new Set(['map', 'municipal3d', 'immersive', 'api'])
 const INTENTS = new Set(['inspection', 'analysis', 'simulation', 'operations', 'embed', 'export', 'unknown'])
 const STRING_OPERATORS = new Set(['eq', 'neq', 'in', 'contains', 'exists'])
@@ -155,7 +163,10 @@ function normalizeFilters(value) {
 
 function normalizeSemanticQuery(input = {}) {
   const query = input.query && typeof input.query === 'object' ? input.query : input
-  const classes = normalizeTextArray(query.classes ?? query.class ?? input.classes, DEFAULT_CLASSES)
+  const classes = normalizeCanonicalSemanticClassKeys(
+    normalizeTextArray(query.classes ?? query.class ?? input.classes, DEFAULT_CLASSES),
+    { fallback: DEFAULT_CLASSES },
+  )
     .filter((key) => SEMANTIC_CLASS_BY_KEY.has(key))
   const selectedClasses = classes.length ? Array.from(new Set(classes)) : DEFAULT_CLASSES
   const filters = normalizeFilters(query.filters ?? input.filters)
@@ -172,11 +183,11 @@ function normalizeSemanticQuery(input = {}) {
 }
 
 function semanticClassLayerKeys(classKeys) {
-  return Array.from(new Set(classKeys.flatMap((key) => SEMANTIC_CLASS_BY_KEY.get(key)?.layerKeys ?? [])))
+  return semanticClassLayerKeysFor(classKeys)
 }
 
 function semanticClassEntityTypes(classKeys) {
-  return Array.from(new Set(classKeys.flatMap((key) => SEMANTIC_CLASS_BY_KEY.get(key)?.entityTypes ?? [])))
+  return semanticClassEntityTypesFor(classKeys)
 }
 
 function fieldExpression(field) {
@@ -311,36 +322,8 @@ function scopeCteSql(scope, addParam) {
   `
 }
 
-function semanticClassCaseSql() {
-  return `
-    CASE
-      WHEN display_layer_key = 'buildings' THEN 'buildings'
-      WHEN display_layer_key = 'roads' THEN 'roads'
-      WHEN display_layer_key = 'boundary' THEN 'boundary'
-      WHEN display_layer_key = 'unclassifiedLand' THEN 'landUseCoverageGap'
-      WHEN display_layer_key = 'greenBlue' THEN 'greenBlue'
-      WHEN display_layer_key = 'places' THEN 'places'
-      WHEN display_layer_key IN ('civic', 'mobility', 'commerce', 'wasteSeeds', 'facilities') THEN 'accessSeeds'
-      WHEN display_layer_key = 'semanticPacks' THEN 'semanticPacks'
-      WHEN display_layer_key = 'providerOverlays' THEN 'providerOverlays'
-      ELSE display_layer_key
-    END
-  `
-}
-
 function layerPriorityCaseSql() {
-  return `
-    CASE semantic_class_key
-      WHEN 'boundary' THEN 0
-      WHEN 'roads' THEN 1
-      WHEN 'greenBlue' THEN 2
-      WHEN 'accessSeeds' THEN 3
-      WHEN 'places' THEN 4
-      WHEN 'buildings' THEN 5
-      WHEN 'semanticPacks' THEN 6
-      ELSE 9
-    END
-  `
+  return canonicalSemanticClassPriorityCaseSql('semantic_class_key')
 }
 
 function normalizedQueryPayload(query, surface, intent) {

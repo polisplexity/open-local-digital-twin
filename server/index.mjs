@@ -10,6 +10,7 @@ import {
 } from './http/security.mjs'
 import { registerAdminRoutes } from './routes/adminRoutes.mjs'
 import { registerAuthRoutes } from './routes/authRoutes.mjs'
+import { registerDataSpaceExchangeRoutes } from './routes/dataSpaceExchangeRoutes.mjs'
 import { registerHealthRoutes } from './routes/healthRoutes.mjs'
 import { registerLiveRoutes } from './routes/liveRoutes.mjs'
 import { registerPlatformRoutes } from './routes/platformRoutes.mjs'
@@ -55,18 +56,17 @@ const PUBLIC_PREFIXES = [
   '/api/platform/context',
   '/api/auth',
   '/api/provider',
+  '/api/data-space',
 ]
 
 const PROTECTED_PREFIXES = [
-  '/apps',
   '/cockpit',
+  '/workspace',
+  '/operations',
+  '/standards',
   '/analytical-map',
   '/city-3d',
   '/civic-xr',
-  '/civic-view',
-  '/map',
-  '/municipal',
-  '/public',
   '/theory',
   '/docs',
   '/profile',
@@ -75,6 +75,16 @@ const PROTECTED_PREFIXES = [
   '/api/live',
   '/api/admin',
 ]
+
+const RETIRED_ROUTE_PREFIXES = [
+  '/apps',
+]
+
+function isRetiredRoute(requestPath) {
+  return RETIRED_ROUTE_PREFIXES.some((prefix) => (
+    requestPath === prefix || requestPath.startsWith(`${prefix}/`)
+  ))
+}
 
 function requireLiveCityAccess(request, response, cityId) {
   const access = requireCityAccess(request, cityId)
@@ -122,6 +132,10 @@ async function bootstrap() {
 
   const app = express()
 
+  app.use('/api/data-space/transfers', express.raw({
+    type: '*/*',
+    limit: process.env.TWIN_STUDIO_DATA_SPACE_BODY_LIMIT ?? '25mb',
+  }))
   app.use(express.json({ limit: process.env.TWIN_STUDIO_JSON_BODY_LIMIT ?? '25mb' }))
   app.use((request, _response, next) => {
     if (request.url.startsWith('/api/live/v1/')) {
@@ -144,22 +158,6 @@ async function bootstrap() {
     response.redirect(302, '/cockpit')
   })
 
-  app.get('/dashboard', (_request, response) => {
-    response.redirect(302, '/cockpit')
-  })
-
-  app.get('/map', (_request, response) => {
-    response.redirect(302, '/analytical-map')
-  })
-
-  app.get('/municipal', (_request, response) => {
-    response.redirect(302, '/city-3d')
-  })
-
-  app.get('/public', (_request, response) => {
-    response.redirect(302, '/civic-xr')
-  })
-
   registerHealthRoutes(app, {
     getStartupStatus: () => ({
       productionDatabase: productionDatabaseStartupStatus,
@@ -169,6 +167,15 @@ async function bootstrap() {
   registerPlatformRoutes(app)
   registerAuthRoutes(app)
   registerProviderRoutes(app)
+  registerDataSpaceExchangeRoutes(app)
+
+  app.all('*splat', (request, response, nextMiddleware) => {
+    if (!isRetiredRoute(request.path)) {
+      nextMiddleware()
+      return
+    }
+    response.status(404).send('Not Found')
+  })
 
   app.use(createAuthGuard({
     publicPrefixes: PUBLIC_PREFIXES,

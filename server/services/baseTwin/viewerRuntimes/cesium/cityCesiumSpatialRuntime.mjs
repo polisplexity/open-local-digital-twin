@@ -180,11 +180,19 @@ export function renderCityCesiumSpatialRuntime() {
         function fitQuerySelection(message = {}, geojson = featureCollection([])) {
           const scopeBounds = boundsFromQueryScope(message.query || {})
           const summaryBounds = normalizedBounds(message.summary?.bounds)
-          const renderedBounds = boundsFromPrimitives(message.primitives) || boundsFromGeojson(geojson)
+          const selectedCount = Number(message.summary?.resultCount ?? message.summary?.returned ?? 0)
+          const returnedCount = Number(message.summary?.returned ?? 0)
+          const largeSelection = selectedCount > CITY3D_QUERY_INTERACTIVE_FEATURE_BUDGET
+            || returnedCount > CITY3D_QUERY_INTERACTIVE_FEATURE_BUDGET
+          const renderedBounds = largeSelection
+            ? null
+            : (boundsFromPrimitives(message.primitives) || boundsFromGeojson(geojson))
           const shouldPreferCityScope = hasCityScope(message.query || {})
           const selectionBounds = shouldPreferCityScope
             ? (scopeBounds || summaryBounds || renderedBounds)
-            : (summaryBounds || scopeBounds || renderedBounds)
+            : largeSelection
+              ? (summaryBounds || scopeBounds || renderedBounds)
+              : (renderedBounds || scopeBounds || summaryBounds)
           const bounds = padBounds(selectionBounds, shouldPreferCityScope ? 0.04 : 0.08)
           const terrainReading = isTerrainSurfaceMode(phenomenaMode)
           if (bounds) {

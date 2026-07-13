@@ -1,0 +1,91 @@
+name: Public release gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Scan the repository with Gitleaks
+        run: >-
+          docker run --rm
+          -v "$PWD:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.30.1
+          dir /repo --redact --no-banner
+
+  build-and-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Use Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Require a clean dependency audit
+        run: npm run security:audit
+      - name: Verify generated user documentation
+        run: npm run test:user-manual-contract-smoke
+      - name: Verify world and viewer boundaries
+        run: |
+          npm run test:world-surface-boundary-smoke
+          npm run test:visual-contract-boundary-smoke
+      - name: Verify generic OIDC contracts
+        run: npm run test:oidc-identity-provider-smoke
+      - name: Verify EU LDT UCS contracts
+        run: |
+          npm run test:eu-ldt-ucs-auth-refresh-smoke
+          npm run test:eu-ldt-ucs-workflow-contract-smoke
+      - name: Build production application
+        run: npm run build
+
+  clean-database:
+    runs-on: ubuntu-latest
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: oldt_ci
+          POSTGRES_USER: oldt
+          POSTGRES_PASSWORD: oldt-ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U oldt -d oldt_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TWIN_STUDIO_DATABASE_URL: postgresql://oldt:oldt-ci-only@127.0.0.1:5432/oldt_ci
+      TWIN_STUDIO_SMOKE_CITY_ID: guanajuato
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Use Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Apply every migration to empty PostGIS
+        run: npm run db:migrate
+      - name: Seed an explicitly synthetic validation city
+        run: node server/tools/seed-public-validation-fixture.mjs
+      - name: Verify database and generic semantic contracts
+        run: |
+          npm run test:ldt-schema-smoke
+          npm run test:indicator-framework-smoke
+          npm run test:subject-query-framework-smoke -- --city=guanajuato
+          npm run test:data-factory-processing-nodes-schema-smoke

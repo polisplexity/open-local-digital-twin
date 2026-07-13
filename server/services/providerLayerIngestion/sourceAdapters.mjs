@@ -143,8 +143,17 @@ function overtureRelease(body = {}) {
       body.sourceVersion ??
       body.source_version ??
       process.env.TWIN_STUDIO_OVERTURE_RELEASE ??
-      '2026-04-15.0',
+      '2026-06-17.0',
   ).trim() || 'latest'
+}
+
+function overtureCliTimeoutArgs() {
+  return [
+    '--connect_timeout',
+    String(numberEnv('TWIN_STUDIO_OVERTURE_CONNECT_TIMEOUT_SECONDS', 30)),
+    '--request_timeout',
+    String(numberEnv('TWIN_STUDIO_OVERTURE_REQUEST_TIMEOUT_SECONDS', 180)),
+  ]
 }
 
 function normalizeOvertureBuildingsGeoJson(geojson, bbox = [], limit = DEFAULT_MAX_OVERTURE_BUILDINGS) {
@@ -211,10 +220,11 @@ async function queryOvertureBuildings(cityConfig, body = {}) {
   const contract = await buildOvertureQueryContract(cityConfig, body, 'buildings')
   const bbox = contract.bbox
   const [west, south, east, north] = bbox
-  const limit = Math.min(
-    numberEnv('TWIN_STUDIO_OVERTURE_BUILDINGS_MAX_FEATURES', DEFAULT_MAX_OVERTURE_BUILDINGS),
-    Math.max(1, Number(body.limit ?? body.maxFeatures ?? body.max_features ?? DEFAULT_MAX_OVERTURE_BUILDINGS)),
-  )
+  const configuredLimit = numberEnv('TWIN_STUDIO_OVERTURE_BUILDINGS_MAX_FEATURES', DEFAULT_MAX_OVERTURE_BUILDINGS)
+  const requestedLimit = Number(body.limit ?? body.maxFeatures ?? body.max_features)
+  const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
+    ? Math.min(configuredLimit, Math.max(1, requestedLimit))
+    : configuredLimit
   const release = contract.release
   const sourceUri = contract.sourceUri
   const startedAt = Date.now()
@@ -235,6 +245,7 @@ async function queryOvertureBuildings(cityConfig, body = {}) {
       'building',
       '--release',
       release,
+      ...overtureCliTimeoutArgs(),
       '--output',
       outputPath,
     ]
@@ -303,10 +314,11 @@ async function queryOvertureRoads(cityConfig, body = {}) {
   const contract = await buildOvertureQueryContract(cityConfig, body, 'roads')
   const bbox = contract.bbox
   const [west, south, east, north] = bbox
-  const limit = Math.min(
-    numberEnv('TWIN_STUDIO_OVERTURE_ROADS_MAX_FEATURES', DEFAULT_MAX_OVERTURE_ROADS),
-    Math.max(1, Number(body.limit ?? body.maxFeatures ?? body.max_features ?? DEFAULT_MAX_OVERTURE_ROADS)),
-  )
+  const configuredLimit = numberEnv('TWIN_STUDIO_OVERTURE_ROADS_MAX_FEATURES', DEFAULT_MAX_OVERTURE_ROADS)
+  const requestedLimit = Number(body.limit ?? body.maxFeatures ?? body.max_features)
+  const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
+    ? Math.min(configuredLimit, Math.max(1, requestedLimit))
+    : configuredLimit
   const release = contract.release
   const sourceUri = contract.sourceUri
   const startedAt = Date.now()
@@ -327,6 +339,7 @@ async function queryOvertureRoads(cityConfig, body = {}) {
       'segment',
       '--release',
       release,
+      ...overtureCliTimeoutArgs(),
       '--output',
       outputPath,
     ]

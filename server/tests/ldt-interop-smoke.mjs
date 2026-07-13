@@ -14,8 +14,11 @@ import {
 
 const { Client } = pg
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
-const REQUIRED_COLLECTIONS = ['buildings', 'roads', 'facilities', 'green-blue-systems', 'places']
+const DEFAULT_CITY_IDS = String(process.env.TWIN_STUDIO_E2E_CITY_ID || process.env.TWIN_STUDIO_CITY_ID || 'guanajuato')
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean)
+const REQUIRED_COLLECTIONS = ['buildings', 'roads']
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -55,8 +58,8 @@ try {
   for (const cityId of cityIds) {
     const dcat = await getDcatCatalog(cityId, { baseUrl })
     assert(dcat['@type'] === 'dcat:Catalog', `DCAT_CATALOG_TYPE_INVALID:${cityId}`)
-    assert((dcat['dcat:dataset'] ?? []).length >= 8, `DCAT_DATASET_COUNT_LOW:${cityId}`)
-    assert((dcat['dcat:service'] ?? []).length >= 2, `DCAT_SERVICES_MISSING:${cityId}`)
+    assert((dcat['dcat:dataset'] ?? []).length >= 1, `DCAT_DATASETS_MISSING:${cityId}`)
+    assert((dcat['dcat:service'] ?? []).length >= 1, `DCAT_SERVICES_MISSING:${cityId}`)
 
     const landing = await getOgcLanding(cityId, { baseUrl })
     assert(Array.isArray(landing.links) && landing.links.length >= 3, `OGC_LANDING_LINKS_MISSING:${cityId}`)

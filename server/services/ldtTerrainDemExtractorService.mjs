@@ -4,7 +4,7 @@ import sharp from 'sharp'
 import { closeSharedProductionPool, withProductionClient as withClient } from './serviceDatabase.mjs'
 import { refreshLdtObjectObservationSummary } from './ldtObservationSummaryService.mjs'
 
-const DEFAULT_CITY_IDS = ['kharkiv']
+const DEFAULT_CITY_IDS = []
 const DEFAULT_SCENARIO_KEY = 'baseline'
 const DEFAULT_TERRAIN_GRID_RESOLUTION_M = 250
 const DEFAULT_TILE_ZOOM = 13

@@ -4,6 +4,7 @@ import { registerLiveBaseRoutes } from './liveBaseRoutes.mjs'
 import { registerLiveBimRoutes } from './liveBimRoutes.mjs'
 import { registerLiveFeatureRoutes } from './liveFeatureRoutes.mjs'
 import { registerLiveOperationsRoutes } from './liveOperationsRoutes.mjs'
+import { registerLiveViewerArtifactRoutes } from './liveViewerArtifactRoutes.mjs'
 
 export function registerLiveRoutes(app, { requireLiveCityAccess, requireAdminRefreshAccess }) {
   registerLiveBaseRoutes(app, { requireLiveCityAccess, requireAdminRefreshAccess })
@@ -12,4 +13,5 @@ export function registerLiveRoutes(app, { requireLiveCityAccess, requireAdminRef
   registerLiveAnalyticsRoutes(app, { requireLiveCityAccess })
   registerLiveBimRoutes(app, { requireLiveCityAccess })
   registerLive3dTilesRoutes(app, { requireLiveCityAccess })
+  registerLiveViewerArtifactRoutes(app, { requireLiveCityAccess })
 }

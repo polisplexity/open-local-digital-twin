@@ -33,6 +33,14 @@ export function renderMapLibreGeometryRuntime() {
 
         function calculateMaxRadius(center, boundary) {
           let maxDistance = 1000
+          let boundaryDistance = 0
+          ;(boundary?.features || []).forEach((feature) => {
+            walkCoordinates(feature.geometry, (coordinate) => {
+              boundaryDistance = Math.max(boundaryDistance, distanceMeters(center, coordinate))
+            })
+          })
+          if (boundaryDistance > 0) return Math.max(1000, boundaryDistance * 1.04)
+
           const bounds = Array.isArray(payload?.bounds) ? payload.bounds.map(Number) : null
           if (bounds && bounds.length === 4 && bounds.every(Number.isFinite) && bounds[0] < bounds[2] && bounds[1] < bounds[3]) {
             ;[[bounds[0], bounds[1]], [bounds[0], bounds[3]], [bounds[2], bounds[1]], [bounds[2], bounds[3]]].forEach((coordinate) => {
@@ -40,11 +48,6 @@ export function renderMapLibreGeometryRuntime() {
             })
             return Math.max(1000, maxDistance * 1.04)
           }
-          ;(boundary?.features || []).forEach((feature) => {
-            walkCoordinates(feature.geometry, (coordinate) => {
-              maxDistance = Math.max(maxDistance, distanceMeters(center, coordinate))
-            })
-          })
           return Math.max(1000, maxDistance * 1.04)
         }
 
@@ -108,12 +111,12 @@ export function renderMapLibreGeometryRuntime() {
 
         function fitBoundary() {
           if (!map) return
-          const dataBounds = payloadBounds()
-          if (dataBounds) {
-            map.fitBounds([[dataBounds[0], dataBounds[1]], [dataBounds[2], dataBounds[3]]], { padding: 58, maxZoom: 13, duration: 0 })
-            return
-          }
           if (!payload?.layers?.boundary?.features?.length) {
+            const dataBounds = payloadBounds()
+            if (dataBounds) {
+              map.fitBounds([[dataBounds[0], dataBounds[1]], [dataBounds[2], dataBounds[3]]], { padding: 58, maxZoom: 13, duration: 0 })
+              return
+            }
             map.setCenter(cityCenter)
             map.setZoom(11)
             return

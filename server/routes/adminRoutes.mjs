@@ -2,6 +2,7 @@ import { requireRateLimit } from '../http/rateLimit.mjs'
 import { registerAdminFiwareRoutes } from './adminFiwareRoutes.mjs'
 import { registerAdminLayerRoutes } from './adminLayerRoutes.mjs'
 import { registerAdminWorkflowRoutes } from './adminWorkflowRoutes.mjs'
+import { registerAdminContextSubjectRoutes } from './adminContextSubjectRoutes.mjs'
 import {
   getCityBasePayload,
   getCityCacheStatus,
@@ -180,6 +181,8 @@ export function registerAdminRoutes(app) {
   })
 
   registerAdminWorkflowRoutes(app)
+
+  registerAdminContextSubjectRoutes(app)
 
   registerAdminFiwareRoutes(app)
 

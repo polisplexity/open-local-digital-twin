@@ -235,7 +235,7 @@ Recommended GitHub wiki or docs structure:
 The following are internal Hadox/Polisplexity operations and should not be
 required to run the open-source product:
 
-- `/home/hadox/ops-center`
+- `<external-operations-workspace>`
 - command-center migration ledgers
 - AI/operator planning notes
 - private email/transcript intelligence used to shape product direction

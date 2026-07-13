@@ -1,6 +1,6 @@
 import { closeLdtInteropPool, generateLdtInteroperability } from '../services/ldtInteropService.mjs'
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = []
 
 function argValue(name) {
   const prefix = `--${name}=`

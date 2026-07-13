@@ -20,7 +20,9 @@ export function renderMapLibreControlRuntime() {
         }
 
         function visibleRenderedLayerIds() {
-          return semanticQueryLayerIds.filter((id) => map.getLayer(id)).concat(
+          return fragmentWorkspaceVectorLayerIds.filter((id) => map.getLayer(id)).concat(
+            fragmentWorkspaceLayerIds.filter((id) => map.getLayer(id)),
+            semanticQueryLayerIds.filter((id) => map.getLayer(id)),
             featureLayerIds.filter((id) => map.getLayer(id)),
             fixedLayerIds.filter((id) => map.getLayer(id)),
           )
@@ -69,13 +71,32 @@ export function renderMapLibreControlRuntime() {
             scheduleFeatureRebuild('layer controls', 140)
           }
 
+          if (message.type === 'twin:apply-visual-state') {
+            const visualState = message.visualState || {}
+            if (visualState.baseMap?.id) {
+              setBaseMap(visualState.baseMap.id, { persist: true, broadcastState: false })
+            }
+            Object.entries(visualState.layers || {}).forEach(([key, visible]) => {
+              setLayerVisibility(key, Boolean(visible))
+            })
+            Object.entries(visualState.viewerConfig?.layerControls || {}).forEach(([key, controls]) => {
+              layerControlState[key] = {
+                ...(layerControlState[key] ?? {}),
+                ...(controls ?? {}),
+              }
+            })
+            updateFixedLayerVisibility()
+            applyMapCameraState(visualState.camera)
+            scheduleFeatureRebuild('saved visual state', 90)
+          }
+
           if (message.type === 'twin:set-city-scale') {
             const scale = message.scale || {}
             const revision = Number(scale.revision ?? 0)
             if (revision < (scaleState.revision ?? 0)) return
             scaleState.revision = revision
             scaleState.coveragePercent = clamp(scale.coveragePercent, 0, 100)
-            scaleState.featureLimit = clamp(scale.featureLimit, 0, 300000)
+            scaleState.featureLimit = clamp(scale.featureLimit, 0, 12000)
             updateFixedLayerVisibility()
             scheduleFeatureRebuild('city coverage', 80)
           }
@@ -94,6 +115,14 @@ export function renderMapLibreControlRuntime() {
 
           if (message.type === 'twin:clear-semantic-query') {
             clearSemanticQueryResult()
+          }
+
+          if (message.type === 'twin:set-fragment-workspace') {
+            setFragmentWorkspaceResult(message)
+          }
+
+          if (message.type === 'twin:clear-fragment-workspace') {
+            clearFragmentWorkspaceResult()
           }
         })
 

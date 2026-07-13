@@ -50,22 +50,4 @@ export function registerViewerShellRoutes(app, { requireLiveCityAccess }) {
     if (!access) return
     sendViewerShell(response, VIEWER_RENDERERS.immersive, access.cityId)
   })
-
-  app.get('/live/adazi/map', (request, response) => {
-    const access = requireLiveCityAccess(request, response, 'adazi')
-    if (!access) return
-    sendViewerShell(response, VIEWER_RENDERERS.map, 'adazi')
-  })
-
-  app.get('/live/adazi/3d', (request, response) => {
-    const access = requireLiveCityAccess(request, response, 'adazi')
-    if (!access) return
-    sendViewerShell(response, VIEWER_RENDERERS['3d'], 'adazi')
-  })
-
-  app.get('/live/adazi/immersive', (request, response) => {
-    const access = requireLiveCityAccess(request, response, 'adazi')
-    if (!access) return
-    sendViewerShell(response, VIEWER_RENDERERS.immersive, 'adazi')
-  })
 }

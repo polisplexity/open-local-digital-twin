@@ -1,6 +1,8 @@
 'use client'
 
 import {
+  buildRawTwinQueryRequest,
+  buildSqlTwinQueryRequest,
   buildTwinQueryRequest,
   TWIN_QUERY_CLASS_LABELS,
 } from '../semanticQueryClient'
@@ -8,6 +10,7 @@ import { normalizeQueryClauses } from './queryPanelModel'
 
 const QUERY_SHARE_MODE = 'twin-query-manifest'
 const QUERY_SHARE_VERSION = '2026-05-22'
+const QUERY_SHARE_VISUAL_STATE_VERSION = '2026-06-24'
 
 export function initialQueryShareState() {
   return {
@@ -25,6 +28,8 @@ function clauseClassLabels(clauses) {
 }
 
 export function twinQueryShareTitle(builder = {}, supportsCityScale = false) {
+  if (builder?.mode === 'sql') return 'Expert SQL query'
+  if (builder?.mode === 'raw') return 'Raw TwinQL query'
   const clauses = normalizeQueryClauses(builder, supportsCityScale)
   const labels = clauseClassLabels(clauses)
   if (!labels.length) return 'TwinQL city-object query'
@@ -32,6 +37,14 @@ export function twinQueryShareTitle(builder = {}, supportsCityScale = false) {
   return uniqueLabels.length === 1
     ? `${uniqueLabels[0]} query`
     : `${uniqueLabels.slice(0, 3).join(' + ')} query`
+}
+
+function isRawQueryBuilder(builder = {}) {
+  return builder?.mode === 'raw'
+}
+
+function isSqlQueryBuilder(builder = {}) {
+  return builder?.mode === 'sql'
 }
 
 function selectionFromQuery(query = {}) {
@@ -62,33 +75,102 @@ function selectionFromQuery(query = {}) {
   }
 }
 
+function visibleLayerKeys(layers = {}) {
+  if (!layers || typeof layers !== 'object') return []
+  return Object.entries(layers)
+    .filter(([, visible]) => Boolean(visible))
+    .map(([key]) => key)
+    .filter(Boolean)
+}
+
+function compactObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : null
+}
+
+function compactVisualState({
+  surfaceKey = 'map',
+  viewerId = 'map',
+  visualState = {},
+} = {}) {
+  const layers = compactObject(visualState.layers) ?? {}
+  const layerKeys = visibleLayerKeys(layers)
+  const camera = compactObject(visualState.camera)
+  const cameraPolicy = compactObject(visualState.cameraPolicy)
+  const baseMap = compactObject(visualState.baseMap)
+  const viewerConfig = compactObject(visualState.viewerConfig) ?? {}
+  const xrSession = compactObject(visualState.xrSession) ?? compactObject(visualState.xrSessionState)
+  const xrMode = visualState.xrMode || visualState.mode || ''
+  return {
+    version: QUERY_SHARE_VISUAL_STATE_VERSION,
+    surface: visualState.surface || surfaceKey,
+    viewerId: visualState.viewerId || viewerId,
+    mode: visualState.mode || xrMode || '',
+    xrMode,
+    layerKeys,
+    layers,
+    camera,
+    cameraPolicy,
+    baseMap,
+    xrSession,
+    viewerConfig,
+    capturedAt: new Date().toISOString(),
+  }
+}
+
 export function buildTwinQuerySharePayload({
   builder = {},
   cityCoverage = 0,
   payload,
   surfaceKey = 'map',
   supportsCityScale = false,
+  visualState = {},
   viewerId = 'map',
 } = {}) {
-  const query = buildTwinQueryRequest({
-    builder,
-    cityCoverage,
-    payload,
-    surface: surfaceKey,
-    viewerId,
-  })
-  const clauses = normalizeQueryClauses(builder, supportsCityScale)
+  const rawMode = isRawQueryBuilder(builder)
+  const sqlMode = isSqlQueryBuilder(builder)
+  let query
+  if (sqlMode) {
+    query = buildSqlTwinQueryRequest({
+      sqlText: builder.sqlText,
+      surface: surfaceKey,
+      viewerId,
+    })
+  } else if (rawMode) {
+    query = buildRawTwinQueryRequest({
+      rawText: builder.rawText,
+      surface: surfaceKey,
+      viewerId,
+    })
+  } else {
+    query = buildTwinQueryRequest({
+      builder,
+      cityCoverage,
+      payload,
+      surface: surfaceKey,
+      viewerId,
+    })
+  }
+  const clauses = rawMode || sqlMode ? [] : normalizeQueryClauses(builder, supportsCityScale)
   const title = twinQueryShareTitle(builder, supportsCityScale)
   const { selection, selectionScope } = selectionFromQuery(query)
+  const compactedVisualState = compactVisualState({
+    surfaceKey,
+    viewerId,
+    visualState,
+  })
 
   return {
     surface: surfaceKey,
     mode: QUERY_SHARE_MODE,
     title,
-    description: `${clauses.length} ${clauses.length === 1 ? 'clause' : 'clauses'} saved for ${viewerId}`,
+    description: sqlMode
+      ? `Expert SQL query and visual state saved for ${viewerId}`
+      : rawMode
+      ? `Raw JSON query and visual state saved for ${viewerId}`
+      : `${clauses.length} ${clauses.length === 1 ? 'clause' : 'clauses'} and visual state saved for ${viewerId}`,
     accessPolicy: 'session',
     publicationStatus: 'draft',
-    layerKeys: [],
+    layerKeys: compactedVisualState.layerKeys,
     selectionScope,
     selection,
     manifest: {
@@ -99,10 +181,20 @@ export function buildTwinQuerySharePayload({
       viewerId,
       query,
       builder,
+      visualState: compactedVisualState,
       summary: {
         clauseCount: clauses.length,
+        rawQuery: rawMode,
+        sqlQuery: sqlMode,
         classes: Array.from(new Set(clauses.map((clause) => clause.classKey).filter(Boolean))),
         selectionScope,
+        visualState: {
+          hasCamera: Boolean(compactedVisualState.camera),
+          hasCameraPolicy: Boolean(compactedVisualState.cameraPolicy),
+          hasXrSession: Boolean(compactedVisualState.xrSession),
+          layerCount: compactedVisualState.layerKeys.length,
+          xrMode: compactedVisualState.xrMode,
+        },
       },
     },
   }
@@ -141,9 +233,28 @@ export function builderFromShare(share = {}) {
   return queryManifestFromShare(share)?.builder ?? null
 }
 
+export function visualStateFromShare(share = {}) {
+  return queryManifestFromShare(share)?.visualState ?? null
+}
+
 export function queryShareLabel(share = {}) {
   const queryManifest = queryManifestFromShare(share)
   return share.title || queryManifest?.title || 'Saved query'
+}
+
+export function queryShareVisualSummary(share = {}) {
+  const visualState = visualStateFromShare(share)
+  if (!visualState) return 'query only'
+  const parts = []
+  if (visualState.xrMode || visualState.mode) parts.push(visualState.xrMode || visualState.mode)
+  const layerCount = Array.isArray(visualState.layerKeys)
+    ? visualState.layerKeys.length
+    : visibleLayerKeys(visualState.layers).length
+  if (layerCount) parts.push(`${layerCount} layers`)
+  if (visualState.camera) parts.push('camera')
+  if (visualState.cameraPolicy) parts.push('viewer config')
+  if (visualState.xrSession?.requestedMode && visualState.xrSession.requestedMode !== 'desktop') parts.push(visualState.xrSession.requestedMode.toUpperCase())
+  return parts.length ? parts.join(' / ') : 'visual state'
 }
 
 export function querySharePublicationLabel(share = {}) {

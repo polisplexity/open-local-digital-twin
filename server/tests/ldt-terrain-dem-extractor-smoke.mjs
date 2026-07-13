@@ -12,7 +12,7 @@ function argValue(name) {
   return arg ? arg.slice(prefix.length) : ''
 }
 
-const cityId = argValue('city') || 'kharkiv'
+const cityId = argValue('city') || 'guanajuato'
 const scenarioKey = argValue('scenario') || 'baseline'
 const gridKey = argValue('grid-key') || 'city-density-2km'
 const tileZoom = argValue('tile-zoom') || process.env.TWIN_STUDIO_TERRAIN_DEM_ZOOM || 12

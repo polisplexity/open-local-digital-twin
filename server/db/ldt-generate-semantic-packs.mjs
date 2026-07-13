@@ -1,9 +1,10 @@
 import {
   closeLdtSemanticPackPool,
   generateLdtSemanticPacks,
+  getLdtSemanticPackCatalog,
 } from '../services/ldtSemanticPackService.mjs'
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = ['guanajuato']
 
 function argValue(name) {
   const prefix = `--${name}=`
@@ -18,11 +19,25 @@ function cityIdsFromArgs() {
   return cityArg.split(',').map((entry) => entry.trim()).filter(Boolean)
 }
 
+function packSelectionFromArgs() {
+  if (process.argv.includes('--all-packs')) return { allPacks: true }
+  const packArg = argValue('pack') || argValue('packs')
+  if (!packArg) return {}
+  return {
+    packKeys: packArg.split(',').map((entry) => entry.trim()).filter(Boolean),
+  }
+}
+
 try {
-  const result = await generateLdtSemanticPacks({
-    cityIds: cityIdsFromArgs(),
-  })
-  console.log(JSON.stringify(result, null, 2))
+  if (process.argv.includes('--list-packs')) {
+    console.log(JSON.stringify(getLdtSemanticPackCatalog(), null, 2))
+  } else {
+    const result = await generateLdtSemanticPacks({
+      cityIds: cityIdsFromArgs(),
+      ...packSelectionFromArgs(),
+    })
+    console.log(JSON.stringify(result, null, 2))
+  }
 } finally {
   await closeLdtSemanticPackPool()
 }

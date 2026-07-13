@@ -12,7 +12,7 @@ function argValue(name) {
   return arg ? arg.slice(prefix.length) : ''
 }
 
-const cityId = argValue('city') || 'kharkiv'
+const cityId = argValue('city') || 'guanajuato'
 const scenarioKey = argValue('scenario') || 'baseline'
 const gridResolutionM = argValue('grid-resolution-m') || process.env.TWIN_STUDIO_WEATHER_GRID_RESOLUTION_M || 6000
 const endpoint = argValue('endpoint') || process.env.TWIN_STUDIO_WEATHER_OPEN_METEO_ENDPOINT || undefined

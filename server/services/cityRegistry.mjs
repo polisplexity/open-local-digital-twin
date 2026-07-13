@@ -3,25 +3,25 @@ import { appendAuditLog, getDatabase, getRuntimeDir, readJsonFile, readMeta, wri
 
 export const DEFAULT_CITY_REGISTRY = {
   version: 1,
-  activeCityId: 'adazi',
+  activeCityId: 'guanajuato',
   cities: [
     {
-      id: 'adazi',
-      name: 'Ādaži',
-      country: 'Latvia',
-      countryCode: 'lv',
-      region: 'Riga planning region',
-      lat: 57.0756,
-      lon: 24.3374,
+      id: 'guanajuato',
+      name: 'Guanajuato',
+      country: 'Mexico',
+      countryCode: 'mx',
+      region: 'Guanajuato',
+      lat: 21.019,
+      lon: -101.2574,
       enabled: true,
       preloaded: true,
       spotlight: true,
-      twinLabel: 'Ādaži Digital Twin',
-      nominatimQuery: 'Ādaži, Latvia',
-      wikipediaTownPage: '%C4%80da%C5%BEi',
-      wikipediaMunicipalityPage: 'Adazi_Municipality',
-      municipalityTitle: 'Ādaži Municipality',
-      municipalityDescription: 'Municipality of Latvia',
+      twinLabel: 'Guanajuato Digital Twin',
+      nominatimQuery: 'Guanajuato, Guanajuato, Mexico',
+      wikipediaTownPage: 'Guanajuato_City',
+      wikipediaMunicipalityPage: 'Guanajuato_Municipality',
+      municipalityTitle: 'Guanajuato Municipality',
+      municipalityDescription: 'Municipality of Guanajuato, Mexico',
     },
     {
       id: 'tallinn',
@@ -80,6 +80,8 @@ export const DEFAULT_CITY_REGISTRY = {
   ],
 }
 
+const RETIRED_CITY_IDS = new Set(['adazi', 'kharkiv'])
+
 function getRegistryPath() {
   return path.join(getRuntimeDir(), 'city-registry.json')
 }
@@ -93,8 +95,6 @@ function normalizeCity(raw = {}) {
     .replace(/^-+|-+$/g, '')
 
   const rawTwinLabel = String(raw.twinLabel ?? '').trim()
-  const legacyTwinLabel = id === 'adazi' && rawTwinLabel === 'Adazi Digital Twin'
-
   return {
     id,
     name: String(raw.name ?? '').trim() || id,
@@ -106,10 +106,7 @@ function normalizeCity(raw = {}) {
     enabled: raw.enabled !== false,
     preloaded: Boolean(raw.preloaded),
     spotlight: Boolean(raw.spotlight),
-    twinLabel:
-      legacyTwinLabel
-        ? 'Ādaži Digital Twin'
-        : rawTwinLabel || `${String(raw.name ?? id).trim()} Digital Twin`,
+    twinLabel: rawTwinLabel || `${String(raw.name ?? id).trim()} Digital Twin`,
     nominatimQuery: String(raw.nominatimQuery ?? '').trim() || `${String(raw.name ?? id).trim()}, ${String(raw.country ?? '').trim()}`.trim(),
     wikipediaTownPage: String(raw.wikipediaTownPage ?? '').trim() || encodeURIComponent(String(raw.name ?? id).trim()),
     wikipediaMunicipalityPage:
@@ -124,12 +121,14 @@ function normalizeRegistry(raw = {}) {
   const merged = new Map()
 
   DEFAULT_CITY_REGISTRY.cities.forEach((city) => {
+    if (RETIRED_CITY_IDS.has(city.id)) return
     merged.set(city.id, normalizeCity(city))
   })
 
   incomingCities.forEach((city) => {
     const normalized = normalizeCity(city)
     if (!normalized.id) return
+    if (RETIRED_CITY_IDS.has(normalized.id)) return
     const previous = merged.get(normalized.id)
     merged.set(normalized.id, {
       ...(previous ?? {}),

@@ -19,7 +19,7 @@ function argValue(name) {
   return arg ? arg.slice(prefix.length) : ''
 }
 
-const cityId = argValue('city') || 'kharkiv'
+const cityId = argValue('city') || 'guanajuato'
 const scenarioKey = argValue('scenario') || 'baseline'
 const sourceGridKey = argValue('source-grid-key') || undefined
 const rainfallMm = argValue('rainfall-mm') || undefined

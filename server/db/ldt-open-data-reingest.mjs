@@ -3,7 +3,7 @@ import { getProductionDatabaseUrl } from './migrate.mjs'
 
 const { Pool } = pg
 
-const DEFAULT_CITY_IDS = ['adazi', 'kharkiv']
+const DEFAULT_CITY_IDS = []
 const OPEN_LAYER_KEYS = new Set([
   'boundary',
   'roads',
@@ -171,6 +171,20 @@ async function ensureCity(client, cityId) {
   return result.rows[0]
 }
 
+async function clearPreviousSourceFeatureReingest(client, cityId) {
+  const result = await client.query(
+    `
+      DELETE FROM ldt_prov.source_features sf
+      USING ldt_catalog.datasets d
+      WHERE sf.city_id = $1
+        AND sf.dataset_id = d.id
+        AND d.identifier LIKE $2
+    `,
+    [cityId, `tbs:open-data:${cityId}:%`],
+  )
+  return result.rowCount
+}
+
 async function openLayerDefinitions(client, cityId) {
   const result = await client.query(
     `
@@ -188,6 +202,12 @@ async function openLayerDefinitions(client, cityId) {
         metadata
       FROM public.layer_definitions
       WHERE city_id = $1
+        AND EXISTS (
+          SELECT 1
+          FROM public.city_features cf
+          WHERE cf.city_id = public.layer_definitions.city_id
+            AND cf.layer_id = public.layer_definitions.id
+        )
       ORDER BY key
     `,
     [cityId],
@@ -413,8 +433,14 @@ async function copySourceFeaturesRaw(client, cityId, layer, datasetId, activityI
           'payload', sfr.payload
         )
       FROM public.source_features_raw sfr
+      JOIN public.city_features cf
+        ON cf.source_raw_id = sfr.id
+        AND cf.city_id = sfr.city_id
+      LEFT JOIN public.layer_definitions ld
+        ON ld.id = cf.layer_id
       WHERE sfr.city_id = $1
         AND sfr.source_layer = $2
+        AND COALESCE(ld.key, cf.feature_type) = $2
       ON CONFLICT (city_id, dataset_id, source_feature_id) DO UPDATE SET
         activity_id = EXCLUDED.activity_id,
         geom = EXCLUDED.geom,
@@ -604,6 +630,7 @@ async function reingestCity(client, cityId) {
   await client.query('BEGIN')
   try {
     const city = await ensureCity(client, cityId)
+    const clearedSourceFeatures = await clearPreviousSourceFeatureReingest(client, cityId)
     const layers = await openLayerDefinitions(client, cityId)
     const layerSummaries = []
 
@@ -630,6 +657,7 @@ async function reingestCity(client, cityId) {
       cityId,
       name: city.name,
       layerCount: layers.length,
+      clearedSourceFeatures,
       sourceFeatureCount: layerSummaries.reduce((sum, layer) => sum + layer.sourceFeatureCount, 0),
       layers: layerSummaries,
       artifactDatasets,
